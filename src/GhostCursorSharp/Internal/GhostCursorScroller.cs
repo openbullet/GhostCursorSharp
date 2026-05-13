@@ -4,16 +4,16 @@ namespace GhostCursorSharp.Internal;
 
 internal sealed class GhostCursorScroller
 {
-    private readonly GhostCursorElementGeometry _geometry;
+    private readonly ICursorElementGeometry _geometry;
     private readonly GhostCursorState _state;
 
-    public GhostCursorScroller(GhostCursorState state, GhostCursorElementGeometry geometry)
+    public GhostCursorScroller(GhostCursorState state, ICursorElementGeometry geometry)
     {
         _state = state;
         _geometry = geometry;
     }
 
-    public async Task ScrollIntoViewAsync(IElementHandle element, ResolvedScrollIntoViewOptions options)
+    public async Task ScrollIntoViewAsync(ICursorElementHandle element, ResolvedScrollIntoViewOptions options)
     {
         var viewport = await GetViewportMetricsAsync();
         var elementBox = await _geometry.GetElementBoxAsync(element);
@@ -90,10 +90,7 @@ internal sealed class GhostCursorScroller
         if (Math.Abs(_state.Location.X - anchorX) > double.Epsilon ||
             Math.Abs(_state.Location.Y - anchorY) > double.Epsilon)
         {
-            await _state.Page.Mouse.MoveAsync(
-                Convert.ToDecimal(anchorX),
-                Convert.ToDecimal(anchorY),
-                new PuppeteerSharp.Input.MoveOptions { Steps = 1 });
+            await _state.Page.MoveMouseAsync(anchorX, anchorY);
 
             _state.Location = new Vector(anchorX, anchorY);
         }
@@ -137,7 +134,7 @@ internal sealed class GhostCursorScroller
                 stepY = longDelta * yDirection;
             }
 
-            await _state.Page.Mouse.WheelAsync(Convert.ToDecimal(stepX), Convert.ToDecimal(stepY));
+            await _state.Page.MouseWheelAsync(stepX, stepY);
 
             previousLong = nextLong;
             previousShort = nextShort;

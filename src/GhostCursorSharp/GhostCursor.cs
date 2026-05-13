@@ -9,9 +9,10 @@ namespace GhostCursorSharp;
 public sealed class GhostCursor
 {
     private readonly GhostCursorElementLocator _elementLocator;
-    private readonly GhostCursorElementGeometry _geometry;
+    private readonly ICursorElementGeometry _geometry;
     private readonly GhostCursorMover _mover;
     private readonly GhostCursorOptionResolver _optionResolver;
+    private readonly IPage _page;
     private readonly GhostCursorRandomMover _randomMover;
     private readonly GhostCursorScroller _scroller;
     private readonly GhostCursorState _state;
@@ -34,12 +35,14 @@ public sealed class GhostCursor
     /// <param name="options">The optional cursor configuration.</param>
     public GhostCursor(IPage page, GhostCursorOptions? options)
     {
-        _state = new GhostCursorState(page, options?.Start ?? Vector.Origin);
+        _page = page;
+        var pageAdapter = new PuppeteerCursorPageAdapter(page);
+        _state = new GhostCursorState(pageAdapter, options?.Start ?? Vector.Origin);
         DefaultOptions = options?.DefaultOptions;
 
         _optionResolver = new GhostCursorOptionResolver(() => DefaultOptions);
-        _elementLocator = new GhostCursorElementLocator(page);
-        _geometry = new GhostCursorElementGeometry(page);
+        _elementLocator = new GhostCursorElementLocator(pageAdapter);
+        _geometry = new PuppeteerCursorElementGeometry(page);
         _scroller = new GhostCursorScroller(_state, _geometry);
         _mover = new GhostCursorMover(_state, _scroller, _geometry);
         _randomMover = new GhostCursorRandomMover(_state, _mover, _scroller, _optionResolver);
@@ -58,7 +61,7 @@ public sealed class GhostCursor
     /// <summary>
     /// Gets the Puppeteer page controlled by this cursor.
     /// </summary>
-    public IPage Page => _state.Page;
+    public IPage Page => _page;
 
     /// <summary>
     /// Gets or sets the default options applied to cursor actions.
@@ -164,8 +167,8 @@ public sealed class GhostCursor
     /// <param name="options">Optional selector wait settings.</param>
     /// <returns>The resolved element handle.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the selector does not resolve to an element.</exception>
-    public Task<IElementHandle> GetElementAsync(string selector, GetElementOptions? options = null)
-        => _elementLocator.GetElementAsync(selector, _optionResolver.ResolveGetElementOptions(options));
+    public async Task<IElementHandle> GetElementAsync(string selector, GetElementOptions? options = null)
+        => Unwrap(await _elementLocator.GetElementAsync(selector, _optionResolver.ResolveGetElementOptions(options)));
 
     /// <summary>
     /// Returns the provided element handle unchanged.
@@ -188,7 +191,7 @@ public sealed class GhostCursor
     /// </param>
     /// <returns>The resolved element box.</returns>
     public Task<BoundingBox> GetElementBoxAsync(IElementHandle element, bool relativeToMainFrame = true)
-        => _geometry.GetElementBoxAsync(element, relativeToMainFrame);
+        => _geometry.GetElementBoxAsync(Wrap(element), relativeToMainFrame);
 
     /// <summary>
     /// Scrolls the first matching element into view if needed.
@@ -216,7 +219,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when the element is in view.</returns>
     public Task ScrollIntoViewAsync(IElementHandle element, ScrollIntoViewOptions? options = null)
-        => ExecuteActionAsync(() => _scroller.ScrollIntoViewAsync(element, _optionResolver.ResolveScrollIntoViewOptions(options)));
+        => ExecuteActionAsync(() => _scroller.ScrollIntoViewAsync(Wrap(element), _optionResolver.ResolveScrollIntoViewOptions(options)));
 
     /// <summary>
     /// Scrolls the page by the specified delta.
@@ -367,7 +370,7 @@ public sealed class GhostCursor
     {
         var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
         await ExecuteActionAsync(
-            async () => await _mover.MoveAsync(element, resolvedOptions),
+            async () => await _mover.MoveAsync(Wrap(element), resolvedOptions),
             async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
     }
 
@@ -446,10 +449,19 @@ public sealed class GhostCursor
         var resolvedOptions = _optionResolver.ResolveClickOptions(options);
         await ExecuteActionAsync(async () =>
         {
-            await _mover.MoveAsync(element, resolvedOptions);
+            await _mover.MoveAsync(Wrap(element), resolvedOptions);
             await _mover.ClickAsync(resolvedOptions);
         });
     }
+
+    private static PuppeteerCursorElementHandle Wrap(IElementHandle element)
+        => new(element);
+
+    private static IElementHandle Unwrap(ICursorElementHandle element)
+        => element is INativeCursorElementHandle<IElementHandle> nativeElement
+            ? nativeElement.NativeElement
+            : throw new InvalidOperationException(
+                $"The {nameof(GhostCursor)} Puppeteer facade expected a Puppeteer element adapter.");
 
     private async Task ExecuteActionAsync(Func<Task> action, Func<Task>? afterAction = null)
     {

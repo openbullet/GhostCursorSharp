@@ -1,18 +1,16 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp.Internal;
 
 internal sealed class GhostCursorState
 {
     private int _actionDepth;
 
-    public GhostCursorState(IPage page, Vector start)
+    public GhostCursorState(ICursorPageAdapter page, Vector start)
     {
         Page = page;
         Location = start;
     }
 
-    public IPage Page { get; }
+    public ICursorPageAdapter Page { get; }
 
     public Vector Location { get; set; }
 

@@ -1,17 +1,15 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp.Internal;
 
 internal sealed class GhostCursorElementLocator
 {
-    private readonly IPage _page;
+    private readonly ICursorPageAdapter _page;
 
-    public GhostCursorElementLocator(IPage page)
+    public GhostCursorElementLocator(ICursorPageAdapter page)
     {
         _page = page;
     }
 
-    public async Task<IElementHandle> GetElementAsync(string selector, ResolvedGetElementOptions options)
+    public async Task<ICursorElementHandle> GetElementAsync(string selector, ResolvedGetElementOptions options)
     {
         if (selector.StartsWith("//", StringComparison.Ordinal) ||
             selector.StartsWith("(//", StringComparison.Ordinal))
@@ -20,10 +18,7 @@ internal sealed class GhostCursorElementLocator
 
             if (options.WaitForSelector is not null)
             {
-                await _page.WaitForSelectorAsync(xpathSelector, new WaitForSelectorOptions
-                {
-                    Timeout = options.WaitForSelector.Value
-                });
+                await _page.WaitForSelectorAsync(xpathSelector, options.WaitForSelector.Value);
             }
 
             var elements = await _page.QuerySelectorAllAsync(xpathSelector);
@@ -35,10 +30,7 @@ internal sealed class GhostCursorElementLocator
 
         if (options.WaitForSelector is not null)
         {
-            await _page.WaitForSelectorAsync(selector, new WaitForSelectorOptions
-            {
-                Timeout = options.WaitForSelector.Value
-            });
+            await _page.WaitForSelectorAsync(selector, options.WaitForSelector.Value);
         }
 
         return await _page.QuerySelectorAsync(selector)

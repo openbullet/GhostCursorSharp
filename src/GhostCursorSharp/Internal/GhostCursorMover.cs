@@ -1,5 +1,4 @@
 using PuppeteerSharp;
-using PuppeteerSharp.Input;
 
 namespace GhostCursorSharp.Internal;
 
@@ -8,14 +7,14 @@ internal sealed class GhostCursorMover
     private const double OvershootRadius = 120;
     private const double OvershootSpread = 10;
 
-    private readonly GhostCursorElementGeometry _geometry;
+    private readonly ICursorElementGeometry _geometry;
     private readonly GhostCursorScroller _scroller;
     private readonly GhostCursorState _state;
 
     public GhostCursorMover(
         GhostCursorState state,
         GhostCursorScroller scroller,
-        GhostCursorElementGeometry geometry)
+        ICursorElementGeometry geometry)
     {
         _state = state;
         _scroller = scroller;
@@ -37,10 +36,7 @@ internal sealed class GhostCursorMover
                 return;
             }
 
-            await _state.Page.Mouse.MoveAsync(
-                Convert.ToDecimal(point.X),
-                Convert.ToDecimal(point.Y),
-                new PuppeteerSharp.Input.MoveOptions { Steps = 1 });
+            await _state.Page.MoveMouseAsync(point.X, point.Y);
 
             _state.Location = point;
 
@@ -78,14 +74,14 @@ internal sealed class GhostCursorMover
         await MoveWithOvershootAsync(destination, options);
     }
 
-    public async Task MoveAsync(IElementHandle element, ResolvedMoveOptions options)
+    public async Task MoveAsync(ICursorElementHandle element, ResolvedMoveOptions options)
         => await MoveAsync(() => Task.FromResult(element), options, canReacquire: false);
 
-    public async Task MoveAsync(Func<Task<IElementHandle>> elementResolver, ResolvedMoveOptions options)
+    public async Task MoveAsync(Func<Task<ICursorElementHandle>> elementResolver, ResolvedMoveOptions options)
         => await MoveAsync(elementResolver, options, canReacquire: true);
 
     private async Task MoveAsync(
-        Func<Task<IElementHandle>> elementResolver,
+        Func<Task<ICursorElementHandle>> elementResolver,
         ResolvedMoveOptions options,
         bool canReacquire)
     {
@@ -93,7 +89,7 @@ internal sealed class GhostCursorMover
 
         for (var attempt = 0; attempt <= options.MaxTries; attempt++)
         {
-            IElementHandle element;
+            ICursorElementHandle element;
             try
             {
                 element = await elementResolver();
@@ -150,18 +146,10 @@ internal sealed class GhostCursorMover
     }
 
     public Task MouseDownAsync(ResolvedClickOptions options)
-        => _state.Page.Mouse.DownAsync(new PuppeteerSharp.Input.ClickOptions
-        {
-            Button = options.Button,
-            Count = options.ClickCount
-        });
+        => _state.Page.MouseDownAsync(options.Button, options.ClickCount);
 
     public Task MouseUpAsync(ResolvedClickOptions options)
-        => _state.Page.Mouse.UpAsync(new PuppeteerSharp.Input.ClickOptions
-        {
-            Button = options.Button,
-            Count = options.ClickCount
-        });
+        => _state.Page.MouseUpAsync(options.Button, options.ClickCount);
 
     public async Task ClickAsync(ResolvedClickOptions options)
     {

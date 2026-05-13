@@ -3,20 +3,22 @@ using PuppeteerSharp;
 
 namespace GhostCursorSharp.Internal;
 
-internal sealed class GhostCursorElementGeometry
+internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
 {
     private readonly IPage _page;
 
-    public GhostCursorElementGeometry(IPage page)
+    public PuppeteerCursorElementGeometry(IPage page)
     {
         _page = page;
     }
 
-    public async Task<BoundingBox> GetElementBoxAsync(IElementHandle element, bool relativeToMainFrame = true)
+    public async Task<BoundingBox> GetElementBoxAsync(ICursorElementHandle element, bool relativeToMainFrame = true)
     {
+        var nativeElement = UnwrapElement(element);
+
         try
         {
-            var objectId = GetRemoteObjectId(element);
+            var objectId = GetRemoteObjectId(nativeElement);
             if (string.IsNullOrWhiteSpace(objectId))
             {
                 throw new InvalidOperationException("Element does not expose a CDP object id.");
@@ -45,7 +47,7 @@ internal sealed class GhostCursorElementGeometry
 
             if (!relativeToMainFrame)
             {
-                await AdjustForChildFrameAsync(element, elementBox);
+                await AdjustForChildFrameAsync(nativeElement, elementBox);
             }
 
             return elementBox;
@@ -54,12 +56,12 @@ internal sealed class GhostCursorElementGeometry
         {
             try
             {
-                return await element.BoundingBoxAsync()
+                return await nativeElement.BoundingBoxAsync()
                     ?? throw new InvalidOperationException("Element bounding box was null.");
             }
             catch
             {
-                var box = await element.EvaluateFunctionAsync<DomRectBox>(
+                var box = await nativeElement.EvaluateFunctionAsync<DomRectBox>(
                     "(el) => { const rect = el.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }");
 
                 return new BoundingBox
@@ -72,6 +74,12 @@ internal sealed class GhostCursorElementGeometry
             }
         }
     }
+
+    private static IElementHandle UnwrapElement(ICursorElementHandle element)
+        => element is INativeCursorElementHandle<IElementHandle> nativeElement
+            ? nativeElement.NativeElement
+            : throw new InvalidOperationException(
+                $"The {nameof(PuppeteerCursorElementGeometry)} requires a Puppeteer element handle adapter.");
 
     private static string? GetRemoteObjectId(IElementHandle element)
     {
