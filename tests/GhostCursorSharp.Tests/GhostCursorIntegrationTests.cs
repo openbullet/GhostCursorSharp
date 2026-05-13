@@ -69,6 +69,55 @@ public class GhostCursorIntegrationTests
     }
 
     [Fact]
+    public async Task MoveAsync_TargetsAVisibleInlineFragment()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0; font: 16px/1.4 sans-serif;">
+              <div style="width: 110px; margin: 48px;">
+                <a id="inline-link" href="#" style="color: #06c;">
+                  Ghost cursor should target a visible wrapped inline fragment reliably.
+                </a>
+              </div>
+            </body>
+            </html>
+            """);
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            Start = new Vector(10, 10),
+            DefaultOptions = new DefaultOptions
+            {
+                Move = FastMoveOptions()
+            }
+        });
+
+        var inlineLink = await page.QuerySelectorAsync("#inline-link")
+            ?? throw new InvalidOperationException("inline-link not found");
+
+        await cursor.MoveAsync(inlineLink);
+
+        var intersectsClientRect = await page.EvaluateFunctionAsync<bool>(
+            """
+            (point) => {
+              const rects = [...document.querySelector('#inline-link').getClientRects()];
+              return rects.some(rect =>
+                point.x > rect.left &&
+                point.x <= rect.right &&
+                point.y > rect.top &&
+                point.y <= rect.bottom);
+            }
+            """,
+            new { x = cursor.Location.X, y = cursor.Location.Y });
+
+        Assert.True(intersectsClientRect);
+    }
+
+    [Fact]
     public async Task MoveAsync_ScrollsOffscreenElementsIntoView()
     {
         await using var browser = await LaunchBrowserAsync();
@@ -106,6 +155,125 @@ public class GhostCursorIntegrationTests
         Assert.Equal(4450, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
         Assert.Equal(2250, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
         Assert.True(await box3.IsIntersectingViewportAsync(0));
+    }
+
+    [Fact]
+    public async Task ClickAsync_ClicksElementInsideIframe()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0;">
+              <script>window.iframeClicked = false;</script>
+              <iframe
+                id="demo-frame"
+                style="margin-left: 120px; margin-top: 80px; width: 320px; height: 220px;"
+                srcdoc="
+                  <!doctype html>
+                  <html lang='en'>
+                  <body style='margin: 0; position: relative; height: 100vh;'>
+                    <button
+                      id='frame-button'
+                      style='position: absolute; left: 80px; top: 60px; width: 120px; height: 48px;'
+                      onclick='window.parent.iframeClicked = true'>
+                      Frame button
+                    </button>
+                  </body>
+                  </html>">
+              </iframe>
+            </body>
+            </html>
+            """);
+
+        var frameElement = await page.QuerySelectorAsync("#demo-frame")
+            ?? throw new InvalidOperationException("demo-frame not found");
+        var frame = await frameElement.ContentFrameAsync()
+            ?? throw new InvalidOperationException("iframe content frame not available");
+        var frameButton = await frame.QuerySelectorAsync("#frame-button")
+            ?? throw new InvalidOperationException("frame-button not found");
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            DefaultOptions = new DefaultOptions
+            {
+                Click = FastClickOptions()
+            }
+        });
+
+        await cursor.ClickAsync(frameButton);
+
+        Assert.True(await page.EvaluateExpressionAsync<bool>("window.iframeClicked"));
+    }
+
+    [Fact]
+    public async Task MoveAsync_RetriesWhenTheElementMovesDuringThePath()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0; overflow: hidden;">
+              <div
+                id="moving-box"
+                style="position: absolute; left: 520px; top: 80px; width: 80px; height: 80px; background: #eee;">
+              </div>
+              <script>
+                window.moveEventCount = 0;
+                setTimeout(() => {
+                  const box = document.querySelector('#moving-box');
+                  box.style.left = '160px';
+                  box.style.top = '280px';
+                  window.moveEventCount += 1;
+                }, 30);
+              </script>
+            </body>
+            </html>
+            """);
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            Start = new Vector(5, 5),
+            DefaultOptions = new DefaultOptions
+            {
+                Move = new MoveOptions
+                {
+                    MoveSpeed = 20,
+                    MoveDelay = 0,
+                    RandomizeMoveDelay = false,
+                    DelayPerStep = 8,
+                    ScrollDelay = 0,
+                    ScrollSpeed = 100,
+                    PaddingPercentage = 100,
+                    OvershootThreshold = 10,
+                    MaxTries = 2
+                }
+            }
+        });
+
+        var movingBox = await page.QuerySelectorAsync("#moving-box")
+            ?? throw new InvalidOperationException("moving-box not found");
+
+        await cursor.MoveAsync(movingBox);
+
+        var endedInsideMovedElement = await page.EvaluateFunctionAsync<bool>(
+            """
+            (point) => {
+              const rect = document.querySelector('#moving-box').getBoundingClientRect();
+              return point.x > rect.left &&
+                point.x <= rect.right &&
+                point.y > rect.top &&
+                point.y <= rect.bottom;
+            }
+            """,
+            new { x = cursor.Location.X, y = cursor.Location.Y });
+
+        Assert.True(await page.EvaluateExpressionAsync<bool>("window.moveEventCount === 1"));
+        Assert.True(endedInsideMovedElement);
     }
 
     [Fact]
@@ -249,9 +417,26 @@ public class GhostCursorIntegrationTests
             WaitForClick = 0
         };
 
+    private static MoveOptions FastMoveOptions()
+        => new()
+        {
+            MoveSpeed = 99,
+            MoveDelay = 0,
+            RandomizeMoveDelay = false,
+            DelayPerStep = 0,
+            ScrollDelay = 0,
+            ScrollSpeed = 100,
+            PaddingPercentage = 100
+        };
+
     private static async Task LoadFixtureAsync(IPage page)
     {
         var html = await File.ReadAllTextAsync(FixturePath);
+        await LoadContentAsync(page, html);
+    }
+
+    private static async Task LoadContentAsync(IPage page, string html)
+    {
         await page.SetViewportAsync(new ViewPortOptions
         {
             Width = 800,
