@@ -31,4 +31,11 @@
     <ProjectReference Include="..\..\src\GhostCursorSharp\GhostCursorSharp.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\custom-page.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Fixtures\custom-page.html</TargetPath>
+    </None>
+  </ItemGroup>
+
 </Project>
