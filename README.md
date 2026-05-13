@@ -9,7 +9,7 @@ It generates human-like mouse paths between coordinates and provides a browser-f
 Install the package:
 
 ```powershell
-dotnet add package OpenBullet.GhostCursorSharp
+dotnet add package Ruri.GhostCursorSharp
 ```
 
 If you are developing this repo itself:
