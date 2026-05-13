@@ -13,6 +13,7 @@
     <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;bezier</PackageTags>
     <Version>0.1.0</Version>
     <PackageReleaseNotes>Initial OpenBullet GhostCursorSharp package release.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
   </PropertyGroup>
@@ -23,6 +24,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
   </ItemGroup>
 
 </Project>
