@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GhostCursorSharp/GhostCursorSharp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GhostCursorSharp.Tests/GhostCursorSharp.Tests.csproj" />
+  </Folder>
+</Solution>

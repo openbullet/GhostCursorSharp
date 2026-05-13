@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>GhostCursorSharp</PackageId>
+    <Authors>openbullet</Authors>
+    <Description>Human-like mouse movement generation and PuppeteerSharp cursor automation.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
+    <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;bezier</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
