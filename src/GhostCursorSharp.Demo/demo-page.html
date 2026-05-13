@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GhostCursorSharp Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(255, 226, 153, 0.75), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(136, 204, 255, 0.65), transparent 28%),
+        linear-gradient(135deg, #f7f4ec 0%, #e8eef7 100%);
+      color: #18202a;
+    }
+
+    main {
+      position: relative;
+      width: 1400px;
+      height: 900px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 0;
+      padding: 32px 36px 0;
+      font-size: 44px;
+      letter-spacing: -0.04em;
+    }
+
+    p {
+      margin: 10px 36px 0;
+      max-width: 560px;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .target {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      border-radius: 22px;
+      border: 2px solid rgba(24, 32, 42, 0.12);
+      box-shadow: 0 18px 45px rgba(24, 32, 42, 0.12);
+      font-weight: 700;
+      user-select: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .target:hover {
+      transform: scale(1.03);
+      box-shadow: 0 22px 55px rgba(24, 32, 42, 0.2);
+    }
+
+    #target-a {
+      left: 90px;
+      top: 170px;
+      width: 190px;
+      height: 120px;
+      background: #ffe08a;
+    }
+
+    #target-b {
+      left: 970px;
+      top: 150px;
+      width: 240px;
+      height: 150px;
+      background: #9ad7ff;
+    }
+
+    #target-c {
+      left: 265px;
+      top: 560px;
+      width: 260px;
+      height: 140px;
+      background: #9ef0b8;
+    }
+
+    #target-d {
+      left: 1020px;
+      top: 545px;
+      width: 200px;
+      height: 180px;
+      background: #ffb3a7;
+    }
+
+    #track {
+      position: absolute;
+      left: 620px;
+      top: 220px;
+      width: 130px;
+      height: 420px;
+      border-radius: 999px;
+      border: 3px dashed rgba(24, 32, 42, 0.16);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>GhostCursorSharp Visual Demo</h1>
+    <p>
+      A visible mouse helper is installed. The cursor should move along curved paths
+      between these targets instead of snapping in straight lines.
+    </p>
+    <div id="target-a" class="target">Target A</div>
+    <div id="target-b" class="target">Target B</div>
+    <div id="target-c" class="target">Target C</div>
+    <div id="target-d" class="target">Target D</div>
+    <div id="track" aria-hidden="true"></div>
+  </main>
+</body>
+</html>
