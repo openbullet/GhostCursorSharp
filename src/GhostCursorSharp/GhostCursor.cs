@@ -1,5 +1,5 @@
+using GhostCursorSharp.Internal;
 using PuppeteerSharp;
-using PuppeteerSharp.Input;
 
 namespace GhostCursorSharp;
 
@@ -8,10 +8,11 @@ namespace GhostCursorSharp;
 /// </summary>
 public sealed class GhostCursor
 {
-    private const double OvershootSpread = 10;
-    private const double OvershootRadius = 120;
-
-    private readonly IPage _page;
+    private readonly GhostCursorElementLocator _elementLocator;
+    private readonly GhostCursorMover _mover;
+    private readonly GhostCursorOptionResolver _optionResolver;
+    private readonly GhostCursorScroller _scroller;
+    private readonly GhostCursorState _state;
     private MouseHelperInstallation? _mouseHelper;
 
     /// <summary>
@@ -31,10 +32,13 @@ public sealed class GhostCursor
     /// <param name="options">The optional cursor configuration.</param>
     public GhostCursor(IPage page, GhostCursorOptions? options)
     {
-        _page = page;
-        Page = page;
-        Location = options?.Start ?? Vector.Origin;
+        _state = new GhostCursorState(page, options?.Start ?? Vector.Origin);
         DefaultOptions = options?.DefaultOptions;
+
+        _optionResolver = new GhostCursorOptionResolver(() => DefaultOptions);
+        _elementLocator = new GhostCursorElementLocator(page);
+        _scroller = new GhostCursorScroller(_state);
+        _mover = new GhostCursorMover(_state, _scroller);
 
         if (options?.Visible == true)
         {
@@ -45,7 +49,7 @@ public sealed class GhostCursor
     /// <summary>
     /// Gets the Puppeteer page controlled by this cursor.
     /// </summary>
-    public IPage Page { get; }
+    public IPage Page => _state.Page;
 
     /// <summary>
     /// Gets or sets the default options applied to cursor actions.
@@ -55,7 +59,7 @@ public sealed class GhostCursor
     /// <summary>
     /// Gets the current cursor location tracked by this instance.
     /// </summary>
-    public Vector Location { get; private set; }
+    public Vector Location => _state.Location;
 
     /// <summary>
     /// Creates a cursor using a compatibility-oriented factory method.
@@ -88,7 +92,7 @@ public sealed class GhostCursor
             return _mouseHelper;
         }
 
-        _mouseHelper = await MouseHelper.InstallAsync(_page);
+        _mouseHelper = await MouseHelper.InstallAsync(Page);
         return _mouseHelper;
     }
 
@@ -121,43 +125,8 @@ public sealed class GhostCursor
     /// <param name="options">Optional selector wait settings.</param>
     /// <returns>The resolved element handle.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the selector does not resolve to an element.</exception>
-    public async Task<IElementHandle> GetElementAsync(string selector, GetElementOptions? options = null)
-    {
-        var resolvedOptions = ResolveGetElementOptions(options);
-
-        if (selector.StartsWith("//", StringComparison.Ordinal) ||
-            selector.StartsWith("(//", StringComparison.Ordinal))
-        {
-            var xpathSelector = $"xpath/.{selector}";
-
-            if (resolvedOptions.WaitForSelector is not null)
-            {
-                await _page.WaitForSelectorAsync(xpathSelector, new WaitForSelectorOptions
-                {
-                    Timeout = resolvedOptions.WaitForSelector.Value
-                });
-            }
-
-            var elements = await _page.QuerySelectorAllAsync(xpathSelector);
-            return elements.FirstOrDefault()
-                ?? throw new InvalidOperationException(
-                    $"Could not find element with selector '{selector}'. " +
-                    "Specify WaitForSelector when the element is expected to appear later.");
-        }
-
-        if (resolvedOptions.WaitForSelector is not null)
-        {
-            await _page.WaitForSelectorAsync(selector, new WaitForSelectorOptions
-            {
-                Timeout = resolvedOptions.WaitForSelector.Value
-            });
-        }
-
-        return await _page.QuerySelectorAsync(selector)
-            ?? throw new InvalidOperationException(
-                $"Could not find element with selector '{selector}'. " +
-                "Specify WaitForSelector when the element is expected to appear later.");
-    }
+    public Task<IElementHandle> GetElementAsync(string selector, GetElementOptions? options = null)
+        => _elementLocator.GetElementAsync(selector, _optionResolver.ResolveGetElementOptions(options));
 
     /// <summary>
     /// Scrolls the first matching element into view if needed.
@@ -167,12 +136,12 @@ public sealed class GhostCursor
     /// <returns>A task that completes when the element is in view.</returns>
     public async Task ScrollIntoViewAsync(string selector, ScrollIntoViewOptions? options = null)
     {
-        var element = await GetElementAsync(selector, options is null ? null : new GetElementOptions
-        {
-            WaitForSelector = options.WaitForSelector
-        });
+        var resolvedOptions = _optionResolver.ResolveScrollIntoViewOptions(options);
+        var element = await _elementLocator.GetElementAsync(
+            selector,
+            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
 
-        await ScrollIntoViewAsync(element, options);
+        await _scroller.ScrollIntoViewAsync(element, resolvedOptions);
     }
 
     /// <summary>
@@ -181,74 +150,8 @@ public sealed class GhostCursor
     /// <param name="element">The element to ensure is visible.</param>
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when the element is in view.</returns>
-    public async Task ScrollIntoViewAsync(IElementHandle element, ScrollIntoViewOptions? options = null)
-    {
-        var resolvedOptions = ResolveScrollIntoViewOptions(options);
-        var viewport = await GetViewportMetricsAsync();
-        var elementBox = await GetBoundingBoxAsync(element);
-        var margin = resolvedOptions.InViewportMargin ?? 0;
-        var box = ToBoxEdges(elementBox);
-
-        var targetBox = new BoxEdges(
-            Top: Math.Max(box.Top - margin + viewport.ScrollPositionTop, 0) - viewport.ScrollPositionTop,
-            Left: Math.Max(box.Left - margin + viewport.ScrollPositionLeft, 0) - viewport.ScrollPositionLeft,
-            Bottom: Math.Min(box.Bottom + margin + viewport.ScrollPositionTop, viewport.DocumentHeight) - viewport.ScrollPositionTop,
-            Right: Math.Min(box.Right + margin + viewport.ScrollPositionLeft, viewport.DocumentWidth) - viewport.ScrollPositionLeft);
-
-        var isInViewport = targetBox.Top >= 0 &&
-                           targetBox.Left >= 0 &&
-                           targetBox.Bottom <= viewport.ViewportHeight &&
-                           targetBox.Right <= viewport.ViewportWidth;
-
-        if (isInViewport)
-        {
-            return;
-        }
-
-        if ((resolvedOptions.InViewportMargin ?? 0) <= 0 &&
-            (resolvedOptions.ScrollSpeed ?? 100) >= 100)
-        {
-            await element.EvaluateFunctionAsync(
-                "(e) => e.scrollIntoView({ block: 'center', inline: 'center' })");
-
-            await DelayAsync(resolvedOptions.ScrollDelay ?? 200);
-            return;
-        }
-
-        try
-        {
-            var deltaY = 0d;
-            var deltaX = 0d;
-
-            if (targetBox.Top < 0)
-            {
-                deltaY = targetBox.Top;
-            }
-            else if (targetBox.Bottom > viewport.ViewportHeight)
-            {
-                deltaY = targetBox.Bottom - viewport.ViewportHeight;
-            }
-
-            if (targetBox.Left < 0)
-            {
-                deltaX = targetBox.Left;
-            }
-            else if (targetBox.Right > viewport.ViewportWidth)
-            {
-                deltaX = targetBox.Right - viewport.ViewportWidth;
-            }
-
-            await ScrollAsync(new Vector(deltaX, deltaY), resolvedOptions);
-        }
-        catch
-        {
-            await element.EvaluateFunctionAsync(
-                "(e, smooth) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: smooth ? 'smooth' : 'auto' })",
-                (resolvedOptions.ScrollSpeed ?? 100) < 90);
-
-            await DelayAsync(resolvedOptions.ScrollDelay ?? 200);
-        }
-    }
+    public Task ScrollIntoViewAsync(IElementHandle element, ScrollIntoViewOptions? options = null)
+        => _scroller.ScrollIntoViewAsync(element, _optionResolver.ResolveScrollIntoViewOptions(options));
 
     /// <summary>
     /// Scrolls the page by the specified delta.
@@ -256,90 +159,8 @@ public sealed class GhostCursor
     /// <param name="delta">The horizontal and vertical document deltas to apply.</param>
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when scrolling finishes.</returns>
-    public async Task ScrollAsync(Vector delta, ScrollOptions? options = null)
-    {
-        var resolvedOptions = ResolveScrollOptions(options);
-        var scrollSpeed = Math.Clamp(resolvedOptions.ScrollSpeed ?? 100, 1, 100);
-        var absoluteX = Math.Abs(delta.X);
-        var absoluteY = Math.Abs(delta.Y);
-        var viewport = await GetViewportMetricsAsync();
-        var startScrollX = viewport.ScrollPositionLeft;
-        var startScrollY = viewport.ScrollPositionTop;
-
-        var anchorX = Math.Clamp(Location.X, 1, Math.Max(1, viewport.ViewportWidth - 1));
-        var anchorY = Math.Clamp(Location.Y, 1, Math.Max(1, viewport.ViewportHeight - 1));
-
-        if (Math.Abs(Location.X - anchorX) > double.Epsilon || Math.Abs(Location.Y - anchorY) > double.Epsilon)
-        {
-            await _page.Mouse.MoveAsync(
-                Convert.ToDecimal(anchorX),
-                Convert.ToDecimal(anchorY),
-                new PuppeteerSharp.Input.MoveOptions { Steps = 1 });
-
-            Location = new Vector(anchorX, anchorY);
-        }
-
-        if (absoluteX < double.Epsilon && absoluteY < double.Epsilon)
-        {
-            await DelayAsync(resolvedOptions.ScrollDelay ?? 200);
-            return;
-        }
-
-        var xDirection = delta.X < 0 ? -1 : 1;
-        var yDirection = delta.Y < 0 ? -1 : 1;
-        var largerIsX = absoluteX > absoluteY;
-        var largerDistance = largerIsX ? absoluteX : absoluteY;
-        var shorterDistance = largerIsX ? absoluteY : absoluteX;
-        var largerStep = scrollSpeed < 90
-            ? scrollSpeed
-            : Scale(scrollSpeed, 90, 100, 90, Math.Max(largerDistance, 90));
-        var steps = Math.Max(1, (int)Math.Ceiling(largerDistance / Math.Max(largerStep, 1)));
-
-        var previousLong = 0d;
-        var previousShort = 0d;
-
-        for (var stepIndex = 1; stepIndex <= steps; stepIndex++)
-        {
-            var nextLong = (largerDistance * stepIndex) / steps;
-            var nextShort = (shorterDistance * stepIndex) / steps;
-            var longDelta = nextLong - previousLong;
-            var shortDelta = nextShort - previousShort;
-
-            double stepX;
-            double stepY;
-
-            if (largerIsX)
-            {
-                stepX = longDelta * xDirection;
-                stepY = shortDelta * yDirection;
-            }
-            else
-            {
-                stepX = shortDelta * xDirection;
-                stepY = longDelta * yDirection;
-            }
-
-            await _page.Mouse.WheelAsync(Convert.ToDecimal(stepX), Convert.ToDecimal(stepY));
-
-            previousLong = nextLong;
-            previousShort = nextShort;
-        }
-
-        var endViewport = await GetViewportMetricsAsync();
-        var verticalMoved = Math.Abs(endViewport.ScrollPositionTop - startScrollY) > 0.5;
-        var horizontalMoved = Math.Abs(endViewport.ScrollPositionLeft - startScrollX) > 0.5;
-
-        if ((!verticalMoved && absoluteY > 0) || (!horizontalMoved && absoluteX > 0))
-        {
-            await _page.EvaluateFunctionAsync(
-                "(x, y, smooth) => window.scrollBy({ left: x, top: y, behavior: smooth ? 'smooth' : 'auto' })",
-                delta.X,
-                delta.Y,
-                scrollSpeed < 90);
-        }
-
-        await DelayAsync(resolvedOptions.ScrollDelay ?? 200);
-    }
+    public Task ScrollAsync(Vector delta, ScrollOptions? options = null)
+        => _scroller.ScrollAsync(delta, _optionResolver.ResolveScrollOptions(options));
 
     /// <summary>
     /// Scrolls to a named document boundary.
@@ -348,22 +169,8 @@ public sealed class GhostCursor
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when scrolling finishes.</returns>
     /// <exception cref="ArgumentException">Thrown when the named destination is not recognized.</exception>
-    public async Task ScrollToAsync(string destination, ScrollOptions? options = null)
-    {
-        var viewport = await GetViewportMetricsAsync();
-        var namedTarget = destination.ToLowerInvariant() switch
-        {
-            "top" => new ScrollToDestination { Y = 0 },
-            "bottom" => new ScrollToDestination { Y = viewport.DocumentHeight },
-            "left" => new ScrollToDestination { X = 0 },
-            "right" => new ScrollToDestination { X = viewport.DocumentWidth },
-            _ => throw new ArgumentException(
-                "Named scroll destinations must be one of: top, bottom, left, right.",
-                nameof(destination))
-        };
-
-        await ScrollToAsync(namedTarget, options);
-    }
+    public Task ScrollToAsync(string destination, ScrollOptions? options = null)
+        => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options));
 
     /// <summary>
     /// Scrolls to the specified document coordinates.
@@ -371,16 +178,8 @@ public sealed class GhostCursor
     /// <param name="destination">The target document coordinates.</param>
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when scrolling finishes.</returns>
-    public async Task ScrollToAsync(ScrollToDestination destination, ScrollOptions? options = null)
-    {
-        var viewport = await GetViewportMetricsAsync();
-
-        await ScrollAsync(
-            new Vector(
-                (destination.X ?? viewport.ScrollPositionLeft) - viewport.ScrollPositionLeft,
-                (destination.Y ?? viewport.ScrollPositionTop) - viewport.ScrollPositionTop),
-            options);
-    }
+    public Task ScrollToAsync(ScrollToDestination destination, ScrollOptions? options = null)
+        => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options));
 
     /// <summary>
     /// Moves the cursor to the specified destination using a generated human-like path.
@@ -389,25 +188,8 @@ public sealed class GhostCursor
     /// <param name="pathOptions">Optional path generation settings.</param>
     /// <param name="delayPerStep">An optional delay in milliseconds between path points.</param>
     /// <returns>A task that completes when the movement finishes.</returns>
-    public async Task MoveToAsync(Vector destination, PathOptions? pathOptions = null, int delayPerStep = 0)
-    {
-        var path = CursorPath.Generate(Location, destination, pathOptions);
-
-        foreach (var point in path)
-        {
-            await _page.Mouse.MoveAsync(
-                Convert.ToDecimal(point.X),
-                Convert.ToDecimal(point.Y),
-                new PuppeteerSharp.Input.MoveOptions { Steps = 1 });
-
-            Location = point;
-
-            if (delayPerStep > 0)
-            {
-                await Task.Delay(delayPerStep);
-            }
-        }
-    }
+    public Task MoveToAsync(Vector destination, PathOptions? pathOptions = null, int delayPerStep = 0)
+        => _mover.MoveToAsync(destination, pathOptions, delayPerStep);
 
     /// <summary>
     /// Moves the cursor by the specified delta using a generated human-like path.
@@ -417,7 +199,7 @@ public sealed class GhostCursor
     /// <param name="delayPerStep">An optional delay in milliseconds between path points.</param>
     /// <returns>A task that completes when the movement finishes.</returns>
     public Task MoveByAsync(Vector delta, PathOptions? pathOptions = null, int delayPerStep = 0)
-        => MoveToAsync(new Vector(Location.X + delta.X, Location.Y + delta.Y), pathOptions, delayPerStep);
+        => _mover.MoveByAsync(delta, pathOptions, delayPerStep);
 
     /// <summary>
     /// Moves the cursor to a point selected inside the specified bounding box.
@@ -427,9 +209,9 @@ public sealed class GhostCursor
     /// <returns>A task that completes when the movement finishes.</returns>
     public async Task MoveAsync(BoundingBox boundingBox, MoveOptions? options = null)
     {
-        var resolvedOptions = ResolveMoveOptions(options);
-        await MoveAsyncCore(boundingBox, resolvedOptions);
-        await DelayAsync(GetResolvedMoveDelay(resolvedOptions), resolvedOptions.RandomizeMoveDelay ?? true);
+        var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
+        await _mover.MoveAsync(boundingBox, resolvedOptions);
+        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
     }
 
     /// <summary>
@@ -441,9 +223,9 @@ public sealed class GhostCursor
     /// <exception cref="InvalidOperationException">Thrown when the element bounds cannot be determined.</exception>
     public async Task MoveAsync(IElementHandle element, MoveOptions? options = null)
     {
-        var resolvedOptions = ResolveMoveOptions(options);
-        await MoveAsyncCore(element, resolvedOptions);
-        await DelayAsync(GetResolvedMoveDelay(resolvedOptions), resolvedOptions.RandomizeMoveDelay ?? true);
+        var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
+        await _mover.MoveAsync(element, resolvedOptions);
+        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
     }
 
     /// <summary>
@@ -454,9 +236,13 @@ public sealed class GhostCursor
     /// <returns>A task that completes when the movement finishes.</returns>
     public async Task MoveAsync(string selector, MoveOptions? options = null)
     {
-        var resolvedOptions = ResolveMoveOptions(options);
-        await MoveAsyncCore(selector, resolvedOptions);
-        await DelayAsync(GetResolvedMoveDelay(resolvedOptions), resolvedOptions.RandomizeMoveDelay ?? true);
+        var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
+        var element = await _elementLocator.GetElementAsync(
+            selector,
+            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
+
+        await _mover.MoveAsync(element, resolvedOptions);
+        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
     }
 
     /// <summary>
@@ -465,15 +251,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the button has been pressed.</returns>
     public Task MouseDownAsync(ClickOptions? options = null)
-    {
-        var resolvedOptions = ResolveClickOptions(options);
-
-        return _page.Mouse.DownAsync(new PuppeteerSharp.Input.ClickOptions
-        {
-            Button = resolvedOptions.Button ?? MouseButton.Left,
-            Count = resolvedOptions.ClickCount ?? 1
-        });
-    }
+        => _mover.MouseDownAsync(_optionResolver.ResolveClickOptions(options));
 
     /// <summary>
     /// Releases the configured mouse button at the current cursor location.
@@ -481,27 +259,15 @@ public sealed class GhostCursor
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the button has been released.</returns>
     public Task MouseUpAsync(ClickOptions? options = null)
-    {
-        var resolvedOptions = ResolveClickOptions(options);
-
-        return _page.Mouse.UpAsync(new PuppeteerSharp.Input.ClickOptions
-        {
-            Button = resolvedOptions.Button ?? MouseButton.Left,
-            Count = resolvedOptions.ClickCount ?? 1
-        });
-    }
+        => _mover.MouseUpAsync(_optionResolver.ResolveClickOptions(options));
 
     /// <summary>
     /// Clicks at the current cursor location.
     /// </summary>
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the click finishes.</returns>
-    public async Task ClickAsync(ClickOptions? options = null)
-    {
-        var resolvedOptions = ResolveClickOptions(options);
-
-        await PerformClickAsync(resolvedOptions);
-    }
+    public Task ClickAsync(ClickOptions? options = null)
+        => _mover.ClickAsync(_optionResolver.ResolveClickOptions(options));
 
     /// <summary>
     /// Moves to the specified element selector and clicks inside it.
@@ -511,9 +277,13 @@ public sealed class GhostCursor
     /// <returns>A task that completes when the click finishes.</returns>
     public async Task ClickAsync(string selector, ClickOptions? options = null)
     {
-        var resolvedOptions = ResolveClickOptions(options);
-        await MoveAsyncCore(selector, resolvedOptions);
-        await PerformClickAsync(resolvedOptions);
+        var resolvedOptions = _optionResolver.ResolveClickOptions(options);
+        var element = await _elementLocator.GetElementAsync(
+            selector,
+            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
+
+        await _mover.MoveAsync(element, resolvedOptions);
+        await _mover.ClickAsync(resolvedOptions);
     }
 
     /// <summary>
@@ -524,247 +294,8 @@ public sealed class GhostCursor
     /// <returns>A task that completes when the click finishes.</returns>
     public async Task ClickAsync(IElementHandle element, ClickOptions? options = null)
     {
-        var resolvedOptions = ResolveClickOptions(options);
-        await MoveAsyncCore(element, resolvedOptions);
-        await PerformClickAsync(resolvedOptions);
+        var resolvedOptions = _optionResolver.ResolveClickOptions(options);
+        await _mover.MoveAsync(element, resolvedOptions);
+        await _mover.ClickAsync(resolvedOptions);
     }
-
-    private async Task MoveAsyncCore(string selector, MoveOptions options)
-    {
-        var element = await GetElementAsync(selector, new GetElementOptions
-        {
-            WaitForSelector = options.WaitForSelector
-        });
-        await MoveAsyncCore(element, options);
-    }
-
-    private async Task MoveAsyncCore(IElementHandle element, MoveOptions options)
-    {
-        await ScrollIntoViewAsync(element, new ScrollIntoViewOptions
-        {
-            ScrollDelay = options.ScrollDelay,
-            ScrollSpeed = options.ScrollSpeed,
-            InViewportMargin = options.InViewportMargin,
-            WaitForSelector = options.WaitForSelector
-        });
-        var boundingBox = await GetBoundingBoxAsync(element);
-        var destination = CursorTargeting.GetPointInBox(boundingBox, options);
-
-        await MoveWithOvershootAsync(destination, options);
-
-        var updatedBoundingBox = await GetBoundingBoxAsync(element);
-        if (!IntersectsElement(Location, updatedBoundingBox))
-        {
-            await MoveToAsync(
-                CursorTargeting.GetPointInBox(updatedBoundingBox, options),
-                new PathOptions
-                {
-                    MoveSpeed = options.MoveSpeed,
-                    SpreadOverride = OvershootSpread
-                },
-                options.DelayPerStep ?? 0);
-        }
-    }
-
-    private async Task MoveAsyncCore(BoundingBox boundingBox, MoveOptions options)
-    {
-        var destination = CursorTargeting.GetPointInBox(boundingBox, options);
-        await MoveWithOvershootAsync(destination, options);
-    }
-
-    private async Task MoveWithOvershootAsync(Vector destination, MoveOptions options)
-    {
-        var basePathOptions = new PathOptions
-        {
-            MoveSpeed = options.MoveSpeed,
-            SpreadOverride = options.SpreadOverride
-        };
-
-        if (ShouldOvershoot(Location, destination, options.OvershootThreshold ?? 500))
-        {
-            await MoveToAsync(
-                Overshoot(destination, OvershootRadius),
-                basePathOptions,
-                options.DelayPerStep ?? 0);
-            await MoveToAsync(
-                destination,
-                new PathOptions
-                {
-                    MoveSpeed = options.MoveSpeed,
-                    SpreadOverride = OvershootSpread
-                },
-                options.DelayPerStep ?? 0);
-            return;
-        }
-
-        await MoveToAsync(destination, basePathOptions, options.DelayPerStep ?? 0);
-    }
-
-    private GetElementOptions ResolveGetElementOptions(GetElementOptions? options)
-        => new()
-        {
-            WaitForSelector = options?.WaitForSelector ?? DefaultOptions?.GetElement?.WaitForSelector
-        };
-
-    private MoveOptions ResolveMoveOptions(MoveOptions? options)
-    {
-        var defaults = DefaultOptions?.Move;
-
-        return new MoveOptions
-        {
-            WaitForSelector = options?.WaitForSelector ?? defaults?.WaitForSelector ?? DefaultOptions?.GetElement?.WaitForSelector,
-            ScrollSpeed = options?.ScrollSpeed ?? defaults?.ScrollSpeed ?? DefaultOptions?.Scroll?.ScrollSpeed ?? 100,
-            ScrollDelay = options?.ScrollDelay ?? defaults?.ScrollDelay ?? DefaultOptions?.Scroll?.ScrollDelay ?? 200,
-            InViewportMargin = options?.InViewportMargin ?? defaults?.InViewportMargin ?? DefaultOptions?.Scroll?.InViewportMargin ?? 0,
-            SpreadOverride = options?.SpreadOverride ?? defaults?.SpreadOverride,
-            MoveSpeed = options?.MoveSpeed ?? defaults?.MoveSpeed,
-            MoveDelay = options?.MoveDelay ?? defaults?.MoveDelay ?? 0,
-            RandomizeMoveDelay = options?.RandomizeMoveDelay ?? defaults?.RandomizeMoveDelay ?? true,
-            DelayPerStep = options?.DelayPerStep ?? defaults?.DelayPerStep ?? 0,
-            MaxTries = options?.MaxTries ?? defaults?.MaxTries ?? 10,
-            OvershootThreshold = options?.OvershootThreshold ?? defaults?.OvershootThreshold ?? 500,
-            PaddingPercentage = options?.PaddingPercentage ?? defaults?.PaddingPercentage,
-            Destination = options?.Destination ?? defaults?.Destination
-        };
-    }
-
-    private ClickOptions ResolveClickOptions(ClickOptions? options)
-    {
-        var defaults = DefaultOptions?.Click;
-        var moveDefaults = ResolveMoveOptions(options);
-
-        return new ClickOptions
-        {
-            WaitForSelector = options?.WaitForSelector ?? defaults?.WaitForSelector ?? moveDefaults.WaitForSelector,
-            ScrollSpeed = options?.ScrollSpeed ?? defaults?.ScrollSpeed ?? moveDefaults.ScrollSpeed,
-            ScrollDelay = options?.ScrollDelay ?? defaults?.ScrollDelay ?? moveDefaults.ScrollDelay,
-            InViewportMargin = options?.InViewportMargin ?? defaults?.InViewportMargin ?? moveDefaults.InViewportMargin,
-            SpreadOverride = options?.SpreadOverride ?? defaults?.SpreadOverride ?? moveDefaults.SpreadOverride,
-            MoveSpeed = options?.MoveSpeed ?? defaults?.MoveSpeed ?? moveDefaults.MoveSpeed,
-            MoveDelay = options?.MoveDelay ?? defaults?.MoveDelay ?? 2000,
-            RandomizeMoveDelay = options?.RandomizeMoveDelay ?? defaults?.RandomizeMoveDelay ?? true,
-            DelayPerStep = options?.DelayPerStep ?? defaults?.DelayPerStep ?? moveDefaults.DelayPerStep,
-            MaxTries = options?.MaxTries ?? defaults?.MaxTries ?? moveDefaults.MaxTries,
-            OvershootThreshold = options?.OvershootThreshold ?? defaults?.OvershootThreshold ?? moveDefaults.OvershootThreshold,
-            PaddingPercentage = options?.PaddingPercentage ?? defaults?.PaddingPercentage ?? moveDefaults.PaddingPercentage,
-            Destination = options?.Destination ?? defaults?.Destination ?? moveDefaults.Destination,
-            Hesitate = options?.Hesitate ?? defaults?.Hesitate ?? 0,
-            WaitForClick = options?.WaitForClick ?? defaults?.WaitForClick ?? 0,
-            Button = options?.Button ?? defaults?.Button ?? MouseButton.Left,
-            ClickCount = options?.ClickCount ?? defaults?.ClickCount ?? 1
-        };
-    }
-
-    private ScrollOptions ResolveScrollOptions(ScrollOptions? options)
-    {
-        var defaults = DefaultOptions?.Scroll;
-
-        return new ScrollOptions
-        {
-            ScrollSpeed = options?.ScrollSpeed ?? defaults?.ScrollSpeed ?? 100,
-            ScrollDelay = options?.ScrollDelay ?? defaults?.ScrollDelay ?? 200
-        };
-    }
-
-    private ScrollIntoViewOptions ResolveScrollIntoViewOptions(ScrollIntoViewOptions? options)
-    {
-        var defaults = DefaultOptions?.Scroll;
-
-        return new ScrollIntoViewOptions
-        {
-            ScrollSpeed = options?.ScrollSpeed ?? defaults?.ScrollSpeed ?? 100,
-            ScrollDelay = options?.ScrollDelay ?? defaults?.ScrollDelay ?? 200,
-            WaitForSelector = options?.WaitForSelector ?? defaults?.WaitForSelector,
-            InViewportMargin = options?.InViewportMargin ?? defaults?.InViewportMargin ?? 0
-        };
-    }
-
-    private static async Task<BoundingBox> GetBoundingBoxAsync(IElementHandle element)
-        => await element.BoundingBoxAsync()
-           ?? throw new InvalidOperationException("Could not determine the element bounds.");
-
-    private static bool ShouldOvershoot(Vector from, Vector to, double threshold)
-        => Distance(from, to) > threshold;
-
-    private static bool IntersectsElement(Vector point, BoundingBox box)
-        => point.X > Convert.ToDouble(box.X) &&
-           point.X <= Convert.ToDouble(box.X + box.Width) &&
-           point.Y > Convert.ToDouble(box.Y) &&
-           point.Y <= Convert.ToDouble(box.Y + box.Height);
-
-    private static Vector Overshoot(Vector coordinate, double radius)
-    {
-        var angle = Random.Shared.NextDouble() * 2 * Math.PI;
-        var randomRadius = radius * Math.Sqrt(Random.Shared.NextDouble());
-
-        return new Vector(
-            coordinate.X + (randomRadius * Math.Cos(angle)),
-            coordinate.Y + (randomRadius * Math.Sin(angle)));
-    }
-
-    private static double Distance(Vector from, Vector to)
-    {
-        var deltaX = to.X - from.X;
-        var deltaY = to.Y - from.Y;
-        return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
-    }
-
-    private static int GetResolvedMoveDelay(MoveOptions options)
-        => options.MoveDelay ?? 0;
-
-    private async Task PerformClickAsync(ClickOptions options)
-    {
-        await DelayAsync(options.Hesitate ?? 0);
-        await MouseDownAsync(options);
-        await DelayAsync(options.WaitForClick ?? 0);
-        await MouseUpAsync(options);
-        await DelayAsync(GetResolvedMoveDelay(options), options.RandomizeMoveDelay ?? true);
-    }
-
-    private static double Scale(double value, double fromStart, double fromEnd, double toStart, double toEnd)
-        => toStart + (((value - fromStart) / (fromEnd - fromStart)) * (toEnd - toStart));
-
-    private static Task DelayAsync(int milliseconds, bool randomize = false)
-    {
-        if (milliseconds < 1)
-        {
-            return Task.CompletedTask;
-        }
-
-        var effectiveDelay = randomize
-            ? Random.Shared.Next(0, milliseconds + 1)
-            : milliseconds;
-
-        return Task.Delay(effectiveDelay);
-    }
-
-    private async Task<ViewportMetrics> GetViewportMetricsAsync()
-        => await _page.EvaluateFunctionAsync<ViewportMetrics>(
-            """
-            () => ({
-              viewportWidth: window.innerWidth,
-              viewportHeight: window.innerHeight,
-              documentHeight: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
-              documentWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
-              scrollPositionTop: window.scrollY,
-              scrollPositionLeft: window.scrollX
-            })
-            """);
-
-    private static BoxEdges ToBoxEdges(BoundingBox box)
-        => new(
-            Top: Convert.ToDouble(box.Y),
-            Left: Convert.ToDouble(box.X),
-            Bottom: Convert.ToDouble(box.Y + box.Height),
-            Right: Convert.ToDouble(box.X + box.Width));
-
-    private sealed record ViewportMetrics(
-        double ViewportWidth,
-        double ViewportHeight,
-        double DocumentHeight,
-        double DocumentWidth,
-        double ScrollPositionTop,
-        double ScrollPositionLeft);
-
-    private readonly record struct BoxEdges(double Top, double Left, double Bottom, double Right);
 }
