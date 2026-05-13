@@ -11,6 +11,7 @@ public sealed class GhostCursor
     private readonly GhostCursorElementLocator _elementLocator;
     private readonly GhostCursorMover _mover;
     private readonly GhostCursorOptionResolver _optionResolver;
+    private readonly GhostCursorRandomMover _randomMover;
     private readonly GhostCursorScroller _scroller;
     private readonly GhostCursorState _state;
     private MouseHelperInstallation? _mouseHelper;
@@ -39,10 +40,16 @@ public sealed class GhostCursor
         _elementLocator = new GhostCursorElementLocator(page);
         _scroller = new GhostCursorScroller(_state);
         _mover = new GhostCursorMover(_state, _scroller);
+        _randomMover = new GhostCursorRandomMover(_state, _mover, _scroller, _optionResolver);
 
         if (options?.Visible == true)
         {
             _ = InstallMouseHelperAsync();
+        }
+
+        if (options?.PerformRandomMoves == true)
+        {
+            _randomMover.Toggle(true);
         }
     }
 
@@ -77,6 +84,29 @@ public sealed class GhostCursor
         => new(page, new GhostCursorOptions
         {
             Start = start,
+            DefaultOptions = defaultOptions,
+            Visible = visible
+        });
+
+    /// <summary>
+    /// Creates a cursor using a compatibility-oriented factory method with initial random movement support.
+    /// </summary>
+    /// <param name="page">The Puppeteer page whose mouse will be controlled.</param>
+    /// <param name="start">The initial cursor location. Defaults to the origin.</param>
+    /// <param name="performRandomMoves">Whether background random mouse movements should start immediately.</param>
+    /// <param name="defaultOptions">The default options applied to actions created by this cursor.</param>
+    /// <param name="visible">Whether the visual mouse helper should be installed immediately.</param>
+    /// <returns>A configured <see cref="GhostCursor"/> instance.</returns>
+    public static GhostCursor CreateCursor(
+        IPage page,
+        Vector? start,
+        bool performRandomMoves,
+        DefaultOptions? defaultOptions = null,
+        bool visible = false)
+        => new(page, new GhostCursorOptions
+        {
+            Start = start,
+            PerformRandomMoves = performRandomMoves,
             DefaultOptions = defaultOptions,
             Visible = visible
         });
@@ -119,6 +149,13 @@ public sealed class GhostCursor
         => Location;
 
     /// <summary>
+    /// Toggles background random cursor movement on or off.
+    /// </summary>
+    /// <param name="random">When <see langword="true"/>, enable random movement; otherwise disable it.</param>
+    public void ToggleRandomMove(bool random)
+        => _randomMover.Toggle(random);
+
+    /// <summary>
     /// Resolves the first element matching the selector.
     /// </summary>
     /// <param name="selector">The selector to query. XPath selectors are also supported.</param>
@@ -137,11 +174,14 @@ public sealed class GhostCursor
     public async Task ScrollIntoViewAsync(string selector, ScrollIntoViewOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveScrollIntoViewOptions(options);
-        var element = await _elementLocator.GetElementAsync(
-            selector,
-            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
+        await ExecuteActionAsync(async () =>
+        {
+            var element = await _elementLocator.GetElementAsync(
+                selector,
+                new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
 
-        await _scroller.ScrollIntoViewAsync(element, resolvedOptions);
+            await _scroller.ScrollIntoViewAsync(element, resolvedOptions);
+        });
     }
 
     /// <summary>
@@ -151,7 +191,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when the element is in view.</returns>
     public Task ScrollIntoViewAsync(IElementHandle element, ScrollIntoViewOptions? options = null)
-        => _scroller.ScrollIntoViewAsync(element, _optionResolver.ResolveScrollIntoViewOptions(options));
+        => ExecuteActionAsync(() => _scroller.ScrollIntoViewAsync(element, _optionResolver.ResolveScrollIntoViewOptions(options)));
 
     /// <summary>
     /// Scrolls the page by the specified delta.
@@ -160,7 +200,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when scrolling finishes.</returns>
     public Task ScrollAsync(Vector delta, ScrollOptions? options = null)
-        => _scroller.ScrollAsync(delta, _optionResolver.ResolveScrollOptions(options));
+        => ExecuteActionAsync(() => _scroller.ScrollAsync(delta, _optionResolver.ResolveScrollOptions(options)));
 
     /// <summary>
     /// Scrolls to a named document boundary.
@@ -170,7 +210,7 @@ public sealed class GhostCursor
     /// <returns>A task that completes when scrolling finishes.</returns>
     /// <exception cref="ArgumentException">Thrown when the named destination is not recognized.</exception>
     public Task ScrollToAsync(string destination, ScrollOptions? options = null)
-        => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options));
+        => ExecuteActionAsync(() => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options)));
 
     /// <summary>
     /// Scrolls to the specified document coordinates.
@@ -179,7 +219,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional scroll settings.</param>
     /// <returns>A task that completes when scrolling finishes.</returns>
     public Task ScrollToAsync(ScrollToDestination destination, ScrollOptions? options = null)
-        => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options));
+        => ExecuteActionAsync(() => _scroller.ScrollToAsync(destination, _optionResolver.ResolveScrollOptions(options)));
 
     /// <summary>
     /// Moves the cursor to the specified destination using a generated human-like path.
@@ -189,7 +229,45 @@ public sealed class GhostCursor
     /// <param name="delayPerStep">An optional delay in milliseconds between path points.</param>
     /// <returns>A task that completes when the movement finishes.</returns>
     public Task MoveToAsync(Vector destination, PathOptions? pathOptions = null, int delayPerStep = 0)
-        => _mover.MoveToAsync(destination, pathOptions, delayPerStep);
+    {
+        var resolvedOptions = _optionResolver.ResolveMoveToOptions(null);
+
+        return ExecuteActionAsync(
+            () => _mover.MoveToWithAbortAsync(
+                destination,
+                new PathOptions
+                {
+                    MoveSpeed = pathOptions?.MoveSpeed ?? resolvedOptions.MoveSpeed,
+                    SpreadOverride = pathOptions?.SpreadOverride ?? resolvedOptions.SpreadOverride
+                },
+                delayPerStep == 0 ? resolvedOptions.DelayPerStep : delayPerStep,
+                null),
+            async () => await GhostCursorTiming.DelayAsync(
+                resolvedOptions.MoveDelay,
+                resolvedOptions.RandomizeMoveDelay));
+    }
+
+    /// <summary>
+    /// Moves the cursor to the specified destination using move-to action options.
+    /// </summary>
+    /// <param name="destination">The destination coordinate.</param>
+    /// <param name="options">Optional move-to settings.</param>
+    /// <returns>A task that completes when the movement finishes.</returns>
+    public Task MoveToAsync(Vector destination, MoveToOptions? options)
+    {
+        var resolvedOptions = _optionResolver.ResolveMoveToOptions(options);
+        return ExecuteActionAsync(
+            () => _mover.MoveToWithAbortAsync(
+                destination,
+                new PathOptions
+                {
+                    MoveSpeed = resolvedOptions.MoveSpeed,
+                    SpreadOverride = resolvedOptions.SpreadOverride
+                },
+                resolvedOptions.DelayPerStep,
+                null),
+            async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
+    }
 
     /// <summary>
     /// Moves the cursor by the specified delta using a generated human-like path.
@@ -199,7 +277,45 @@ public sealed class GhostCursor
     /// <param name="delayPerStep">An optional delay in milliseconds between path points.</param>
     /// <returns>A task that completes when the movement finishes.</returns>
     public Task MoveByAsync(Vector delta, PathOptions? pathOptions = null, int delayPerStep = 0)
-        => _mover.MoveByAsync(delta, pathOptions, delayPerStep);
+    {
+        var resolvedOptions = _optionResolver.ResolveMoveToOptions(null);
+
+        return ExecuteActionAsync(
+            () => _mover.MoveByWithAbortAsync(
+                delta,
+                new PathOptions
+                {
+                    MoveSpeed = pathOptions?.MoveSpeed ?? resolvedOptions.MoveSpeed,
+                    SpreadOverride = pathOptions?.SpreadOverride ?? resolvedOptions.SpreadOverride
+                },
+                delayPerStep == 0 ? resolvedOptions.DelayPerStep : delayPerStep,
+                null),
+            async () => await GhostCursorTiming.DelayAsync(
+                resolvedOptions.MoveDelay,
+                resolvedOptions.RandomizeMoveDelay));
+    }
+
+    /// <summary>
+    /// Moves the cursor by the specified delta using move-to action options.
+    /// </summary>
+    /// <param name="delta">The relative movement delta.</param>
+    /// <param name="options">Optional move-to settings.</param>
+    /// <returns>A task that completes when the movement finishes.</returns>
+    public Task MoveByAsync(Vector delta, MoveToOptions? options)
+    {
+        var resolvedOptions = _optionResolver.ResolveMoveToOptions(options);
+        return ExecuteActionAsync(
+            () => _mover.MoveByWithAbortAsync(
+                delta,
+                new PathOptions
+                {
+                    MoveSpeed = resolvedOptions.MoveSpeed,
+                    SpreadOverride = resolvedOptions.SpreadOverride
+                },
+                resolvedOptions.DelayPerStep,
+                null),
+            async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
+    }
 
     /// <summary>
     /// Moves the cursor to a point selected inside the specified bounding box.
@@ -210,8 +326,9 @@ public sealed class GhostCursor
     public async Task MoveAsync(BoundingBox boundingBox, MoveOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
-        await _mover.MoveAsync(boundingBox, resolvedOptions);
-        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
+        await ExecuteActionAsync(
+            async () => await _mover.MoveAsync(boundingBox, resolvedOptions),
+            async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
     }
 
     /// <summary>
@@ -224,8 +341,9 @@ public sealed class GhostCursor
     public async Task MoveAsync(IElementHandle element, MoveOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
-        await _mover.MoveAsync(element, resolvedOptions);
-        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
+        await ExecuteActionAsync(
+            async () => await _mover.MoveAsync(element, resolvedOptions),
+            async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
     }
 
     /// <summary>
@@ -237,12 +355,15 @@ public sealed class GhostCursor
     public async Task MoveAsync(string selector, MoveOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
-        var element = await _elementLocator.GetElementAsync(
-            selector,
-            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
+        await ExecuteActionAsync(async () =>
+        {
+            var element = await _elementLocator.GetElementAsync(
+                selector,
+                new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
 
-        await _mover.MoveAsync(element, resolvedOptions);
-        await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay);
+            await _mover.MoveAsync(element, resolvedOptions);
+        },
+        async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
     }
 
     /// <summary>
@@ -251,7 +372,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the button has been pressed.</returns>
     public Task MouseDownAsync(ClickOptions? options = null)
-        => _mover.MouseDownAsync(_optionResolver.ResolveClickOptions(options));
+        => ExecuteActionAsync(() => _mover.MouseDownAsync(_optionResolver.ResolveClickOptions(options)));
 
     /// <summary>
     /// Releases the configured mouse button at the current cursor location.
@@ -259,7 +380,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the button has been released.</returns>
     public Task MouseUpAsync(ClickOptions? options = null)
-        => _mover.MouseUpAsync(_optionResolver.ResolveClickOptions(options));
+        => ExecuteActionAsync(() => _mover.MouseUpAsync(_optionResolver.ResolveClickOptions(options)));
 
     /// <summary>
     /// Clicks at the current cursor location.
@@ -267,7 +388,7 @@ public sealed class GhostCursor
     /// <param name="options">Optional click settings.</param>
     /// <returns>A task that completes when the click finishes.</returns>
     public Task ClickAsync(ClickOptions? options = null)
-        => _mover.ClickAsync(_optionResolver.ResolveClickOptions(options));
+        => ExecuteActionAsync(() => _mover.ClickAsync(_optionResolver.ResolveClickOptions(options)));
 
     /// <summary>
     /// Moves to the specified element selector and clicks inside it.
@@ -278,12 +399,15 @@ public sealed class GhostCursor
     public async Task ClickAsync(string selector, ClickOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveClickOptions(options);
-        var element = await _elementLocator.GetElementAsync(
-            selector,
-            new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
+        await ExecuteActionAsync(async () =>
+        {
+            var element = await _elementLocator.GetElementAsync(
+                selector,
+                new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
 
-        await _mover.MoveAsync(element, resolvedOptions);
-        await _mover.ClickAsync(resolvedOptions);
+            await _mover.MoveAsync(element, resolvedOptions);
+            await _mover.ClickAsync(resolvedOptions);
+        });
     }
 
     /// <summary>
@@ -295,7 +419,21 @@ public sealed class GhostCursor
     public async Task ClickAsync(IElementHandle element, ClickOptions? options = null)
     {
         var resolvedOptions = _optionResolver.ResolveClickOptions(options);
-        await _mover.MoveAsync(element, resolvedOptions);
-        await _mover.ClickAsync(resolvedOptions);
+        await ExecuteActionAsync(async () =>
+        {
+            await _mover.MoveAsync(element, resolvedOptions);
+            await _mover.ClickAsync(resolvedOptions);
+        });
+    }
+
+    private async Task ExecuteActionAsync(Func<Task> action, Func<Task>? afterAction = null)
+    {
+        using var _ = _state.BeginAction();
+        await action();
+
+        if (afterAction is not null)
+        {
+            await afterAction();
+        }
     }
 }

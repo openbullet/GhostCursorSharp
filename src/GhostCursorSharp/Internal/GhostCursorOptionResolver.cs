@@ -26,6 +26,31 @@ internal sealed class GhostCursorOptionResolver
             options?.ScrollDelay ?? defaults?.Scroll?.ScrollDelay ?? 200);
     }
 
+    public ResolvedRandomMoveOptions ResolveRandomMoveOptions(RandomMoveOptions? options)
+    {
+        var defaults = _getDefaultOptions();
+        var randomMoveDefaults = defaults?.RandomMove;
+
+        return new ResolvedRandomMoveOptions(
+            options?.MoveSpeed ?? randomMoveDefaults?.MoveSpeed,
+            options?.MoveDelay ?? randomMoveDefaults?.MoveDelay ?? 2000,
+            options?.RandomizeMoveDelay ?? randomMoveDefaults?.RandomizeMoveDelay ?? true,
+            options?.DelayPerStep ?? randomMoveDefaults?.DelayPerStep ?? 0);
+    }
+
+    public ResolvedMoveToOptions ResolveMoveToOptions(MoveToOptions? options)
+    {
+        var defaults = _getDefaultOptions();
+        var moveToDefaults = defaults?.MoveTo;
+
+        return new ResolvedMoveToOptions(
+            options?.SpreadOverride ?? moveToDefaults?.SpreadOverride,
+            options?.MoveSpeed ?? moveToDefaults?.MoveSpeed,
+            options?.MoveDelay ?? moveToDefaults?.MoveDelay ?? 0,
+            options?.RandomizeMoveDelay ?? moveToDefaults?.RandomizeMoveDelay ?? true,
+            options?.DelayPerStep ?? moveToDefaults?.DelayPerStep ?? 0);
+    }
+
     public ResolvedScrollIntoViewOptions ResolveScrollIntoViewOptions(ScrollIntoViewOptions? options)
     {
         var defaults = _getDefaultOptions();

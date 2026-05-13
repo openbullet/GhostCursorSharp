@@ -6,6 +6,19 @@ internal sealed record ResolvedGetElementOptions(int? WaitForSelector);
 
 internal record ResolvedScrollOptions(double ScrollSpeed, int ScrollDelay);
 
+internal sealed record ResolvedRandomMoveOptions(
+    double? MoveSpeed,
+    int MoveDelay,
+    bool RandomizeMoveDelay,
+    int DelayPerStep);
+
+internal record ResolvedMoveToOptions(
+    double? SpreadOverride,
+    double? MoveSpeed,
+    int MoveDelay,
+    bool RandomizeMoveDelay,
+    int DelayPerStep);
+
 internal record ResolvedScrollIntoViewOptions(
     double ScrollSpeed,
     int ScrollDelay,

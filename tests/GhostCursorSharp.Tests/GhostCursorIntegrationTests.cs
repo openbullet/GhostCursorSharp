@@ -178,6 +178,44 @@ public class GhostCursorIntegrationTests
         Assert.True(await page.EvaluateExpressionAsync<bool>("window.delayedBoxWasClicked"));
     }
 
+    [Fact]
+    public async Task PerformRandomMoves_StartsAndCanBeStopped()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadFixtureAsync(page);
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            Start = new Vector(10, 10),
+            PerformRandomMoves = true,
+            DefaultOptions = new DefaultOptions
+            {
+                RandomMove = new RandomMoveOptions
+                {
+                    MoveSpeed = 99,
+                    MoveDelay = 25,
+                    RandomizeMoveDelay = false,
+                    DelayPerStep = 0
+                }
+            }
+        });
+
+        var moved = await WaitUntilAsync(
+            () => cursor.GetLocation() != new Vector(10, 10),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(moved);
+
+        cursor.ToggleRandomMove(false);
+        var stopped = await WaitForStableLocationAsync(
+            cursor,
+            TimeSpan.FromMilliseconds(150),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(stopped);
+    }
+
     private static ClickOptions FastClickOptions()
         => new()
         {
@@ -229,5 +267,51 @@ public class GhostCursorIntegrationTests
             ExecutablePath = installedBrowser.GetExecutablePath(),
             DefaultViewport = null
         });
+    }
+
+    private static async Task<bool> WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        var start = DateTime.UtcNow;
+        while (DateTime.UtcNow - start < timeout)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+
+            await Task.Delay(25);
+        }
+
+        return predicate();
+    }
+
+    private static async Task<bool> WaitForStableLocationAsync(
+        GhostCursor cursor,
+        TimeSpan stableDuration,
+        TimeSpan timeout)
+    {
+        var lastLocation = cursor.GetLocation();
+        var stableSince = DateTime.UtcNow;
+        var start = DateTime.UtcNow;
+
+        while (DateTime.UtcNow - start < timeout)
+        {
+            await Task.Delay(25, TestContext.Current.CancellationToken);
+
+            var currentLocation = cursor.GetLocation();
+            if (currentLocation != lastLocation)
+            {
+                lastLocation = currentLocation;
+                stableSince = DateTime.UtcNow;
+                continue;
+            }
+
+            if (DateTime.UtcNow - stableSince >= stableDuration)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

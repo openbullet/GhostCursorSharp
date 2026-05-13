@@ -157,6 +157,14 @@ internal sealed class GhostCursorScroller
         await GhostCursorTiming.DelayAsync(options.ScrollDelay);
     }
 
+    public async Task<Vector> GetRandomViewportPointAsync()
+    {
+        var viewport = await GetViewportMetricsAsync();
+        return new Vector(
+            Random.Shared.NextDouble() * Math.Max(1, viewport.ViewportWidth),
+            Random.Shared.NextDouble() * Math.Max(1, viewport.ViewportHeight));
+    }
+
     public async Task ScrollToAsync(string destination, ResolvedScrollOptions options)
     {
         var viewport = await GetViewportMetricsAsync();

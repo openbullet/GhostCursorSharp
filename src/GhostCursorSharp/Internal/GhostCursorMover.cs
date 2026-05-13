@@ -17,12 +17,21 @@ internal sealed class GhostCursorMover
         _scroller = scroller;
     }
 
-    public async Task MoveToAsync(Vector destination, PathOptions? pathOptions = null, int delayPerStep = 0)
+    public async Task MoveToWithAbortAsync(
+        Vector destination,
+        PathOptions? pathOptions,
+        int delayPerStep,
+        Func<bool>? shouldAbort)
     {
         var path = CursorPath.Generate(_state.Location, destination, pathOptions);
 
         foreach (var point in path)
         {
+            if (shouldAbort?.Invoke() == true)
+            {
+                return;
+            }
+
             await _state.Page.Mouse.MoveAsync(
                 Convert.ToDecimal(point.X),
                 Convert.ToDecimal(point.Y),
@@ -37,11 +46,26 @@ internal sealed class GhostCursorMover
         }
     }
 
+    public Task MoveToAsync(Vector destination, PathOptions? pathOptions = null, int delayPerStep = 0)
+        => MoveToWithAbortAsync(destination, pathOptions, delayPerStep, null);
+
     public Task MoveByAsync(Vector delta, PathOptions? pathOptions = null, int delayPerStep = 0)
-        => MoveToAsync(
+        => MoveToWithAbortAsync(
             new Vector(_state.Location.X + delta.X, _state.Location.Y + delta.Y),
             pathOptions,
-            delayPerStep);
+            delayPerStep,
+            null);
+
+    public Task MoveByWithAbortAsync(
+        Vector delta,
+        PathOptions? pathOptions,
+        int delayPerStep,
+        Func<bool>? shouldAbort)
+        => MoveToWithAbortAsync(
+            new Vector(_state.Location.X + delta.X, _state.Location.Y + delta.Y),
+            pathOptions,
+            delayPerStep,
+            shouldAbort);
 
     public async Task MoveAsync(BoundingBox boundingBox, ResolvedMoveOptions options)
     {

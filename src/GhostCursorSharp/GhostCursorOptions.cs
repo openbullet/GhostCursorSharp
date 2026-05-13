@@ -16,6 +16,11 @@ public sealed class GhostCursorOptions
     public DefaultOptions? DefaultOptions { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether background random mouse movements should start immediately.
+    /// </summary>
+    public bool PerformRandomMoves { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the visual mouse helper should be installed immediately.
     /// </summary>
     public bool Visible { get; init; }

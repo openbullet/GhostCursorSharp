@@ -6,9 +6,19 @@ namespace GhostCursorSharp;
 public sealed class DefaultOptions
 {
     /// <summary>
+    /// Gets the default options for background random movements.
+    /// </summary>
+    public RandomMoveOptions? RandomMove { get; init; }
+
+    /// <summary>
     /// Gets the default options for move actions targeting elements.
     /// </summary>
     public MoveOptions? Move { get; init; }
+
+    /// <summary>
+    /// Gets the default options for move-to actions targeting absolute coordinates.
+    /// </summary>
+    public MoveToOptions? MoveTo { get; init; }
 
     /// <summary>
     /// Gets the default options for click actions.
