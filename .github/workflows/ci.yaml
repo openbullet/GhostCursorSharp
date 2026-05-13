@@ -1,12 +1,12 @@
-name: .NET Build and Publish NuGet Package
+name: .NET CI
 
 on:
   push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -32,15 +32,11 @@ jobs:
     - name: Restore
       run: dotnet restore GhostCursorSharp.slnx
 
+    - name: Verify formatting
+      run: dotnet format GhostCursorSharp.slnx --verify-no-changes
+
     - name: Build
       run: dotnet build GhostCursorSharp.slnx --configuration Release --no-restore
 
     - name: Test
       run: dotnet test GhostCursorSharp.slnx --configuration Release --no-build
-
-    # Don't override the version of the package; trust the version in the project file.
-    - name: Create NuGet Package
-      run: dotnet pack src/GhostCursorSharp/GhostCursorSharp.csproj --output nupkgs --configuration Release --no-build
-
-    - name: Upload NuGet Package
-      run: dotnet nuget push "nupkgs/*.nupkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate

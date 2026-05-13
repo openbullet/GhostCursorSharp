@@ -5,7 +5,8 @@ namespace GhostCursorSharp.Tests;
 public class GhostCursorIntegrationTests
 {
     private static readonly string FixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "custom-page.html");
-    private static readonly string BrowserCachePath = Path.Combine(AppContext.BaseDirectory, ".browser");
+    private static readonly string BrowserCachePath = Environment.GetEnvironmentVariable("GHOSTCURSORSHARP_BROWSER_CACHE_PATH")
+        ?? Path.Combine(AppContext.BaseDirectory, ".browser");
 
     [Fact]
     public async Task GetElementAsync_WaitsForDelayedSelectorFromDefaults()
