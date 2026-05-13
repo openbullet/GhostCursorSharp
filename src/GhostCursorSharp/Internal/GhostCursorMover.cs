@@ -8,13 +8,18 @@ internal sealed class GhostCursorMover
     private const double OvershootRadius = 120;
     private const double OvershootSpread = 10;
 
+    private readonly GhostCursorElementGeometry _geometry;
     private readonly GhostCursorScroller _scroller;
     private readonly GhostCursorState _state;
 
-    public GhostCursorMover(GhostCursorState state, GhostCursorScroller scroller)
+    public GhostCursorMover(
+        GhostCursorState state,
+        GhostCursorScroller scroller,
+        GhostCursorElementGeometry geometry)
     {
         _state = state;
         _scroller = scroller;
+        _geometry = geometry;
     }
 
     public async Task MoveToWithAbortAsync(
@@ -75,16 +80,21 @@ internal sealed class GhostCursorMover
 
     public async Task MoveAsync(IElementHandle element, ResolvedMoveOptions options)
     {
-        await _scroller.ScrollIntoViewAsync(element, options);
-
-        var boundingBox = await GetBoundingBoxAsync(element);
-        var destination = GetTargetPoint(boundingBox, options);
-
-        await MoveWithOvershootAsync(destination, options);
-
-        var updatedBoundingBox = await GetBoundingBoxAsync(element);
-        if (!IntersectsElement(_state.Location, updatedBoundingBox))
+        for (var attempt = 0; attempt <= options.MaxTries; attempt++)
         {
+            await _scroller.ScrollIntoViewAsync(element, options);
+
+            var boundingBox = await _geometry.GetElementBoxAsync(element);
+            var destination = GetTargetPoint(boundingBox, options);
+
+            await MoveWithOvershootAsync(destination, options);
+
+            var updatedBoundingBox = await _geometry.GetElementBoxAsync(element);
+            if (IntersectsElement(_state.Location, updatedBoundingBox))
+            {
+                return;
+            }
+
             await MoveToAsync(
                 GetTargetPoint(updatedBoundingBox, options),
                 new PathOptions
@@ -93,7 +103,14 @@ internal sealed class GhostCursorMover
                     SpreadOverride = OvershootSpread
                 },
                 options.DelayPerStep);
+
+            if (IntersectsElement(_state.Location, updatedBoundingBox))
+            {
+                return;
+            }
         }
+
+        throw new InvalidOperationException("Could not move inside the element within the allowed number of attempts.");
     }
 
     public Task MouseDownAsync(ResolvedClickOptions options)
@@ -153,10 +170,6 @@ internal sealed class GhostCursorMover
             PaddingPercentage = options.PaddingPercentage,
             Destination = options.Destination
         });
-
-    private static async Task<BoundingBox> GetBoundingBoxAsync(IElementHandle element)
-        => await element.BoundingBoxAsync()
-           ?? throw new InvalidOperationException("Could not determine the element bounds.");
 
     private static bool IntersectsElement(Vector point, BoundingBox box)
         => point.X > Convert.ToDouble(box.X) &&

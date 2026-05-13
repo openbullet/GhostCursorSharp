@@ -75,16 +75,36 @@ public class GhostCursorIntegrationTests
         await using var page = await browser.NewPageAsync();
         await LoadFixtureAsync(page);
 
-        var cursor = new GhostCursor(page);
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            DefaultOptions = new DefaultOptions
+            {
+                Move = new MoveOptions
+                {
+                    ScrollDelay = 0,
+                    ScrollSpeed = 99,
+                    InViewportMargin = 50,
+                    MoveSpeed = 99,
+                    MoveDelay = 0,
+                    RandomizeMoveDelay = false,
+                    DelayPerStep = 0,
+                    PaddingPercentage = 100
+                }
+            }
+        });
         var box2 = await page.QuerySelectorAsync("#box2") ?? throw new InvalidOperationException("box2 not found");
         var box3 = await page.QuerySelectorAsync("#box3") ?? throw new InvalidOperationException("box3 not found");
 
         Assert.False(await box2.IsIntersectingViewportAsync(0));
-        await cursor.MoveAsync(box2, FastMoveOptions());
+        await cursor.MoveAsync(box2);
+        Assert.Equal(2500, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
+        Assert.Equal(0, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
         Assert.True(await box2.IsIntersectingViewportAsync(0));
 
         Assert.False(await box3.IsIntersectingViewportAsync(0));
-        await cursor.MoveAsync(box3, FastMoveOptions());
+        await cursor.MoveAsync(box3);
+        Assert.Equal(4450, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
+        Assert.Equal(2250, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
         Assert.True(await box3.IsIntersectingViewportAsync(0));
     }
 
@@ -227,17 +247,6 @@ public class GhostCursorIntegrationTests
             WaitForSelector = 500,
             Hesitate = 0,
             WaitForClick = 0
-        };
-
-    private static MoveOptions FastMoveOptions()
-        => new()
-        {
-            MoveSpeed = 99,
-            MoveDelay = 0,
-            RandomizeMoveDelay = false,
-            DelayPerStep = 0,
-            WaitForSelector = 500,
-            PaddingPercentage = 100
         };
 
     private static async Task LoadFixtureAsync(IPage page)

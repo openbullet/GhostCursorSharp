@@ -38,8 +38,9 @@ public sealed class GhostCursor
 
         _optionResolver = new GhostCursorOptionResolver(() => DefaultOptions);
         _elementLocator = new GhostCursorElementLocator(page);
-        _scroller = new GhostCursorScroller(_state);
-        _mover = new GhostCursorMover(_state, _scroller);
+        var geometry = new GhostCursorElementGeometry(page);
+        _scroller = new GhostCursorScroller(_state, geometry);
+        _mover = new GhostCursorMover(_state, _scroller, geometry);
         _randomMover = new GhostCursorRandomMover(_state, _mover, _scroller, _optionResolver);
 
         if (options?.Visible == true)

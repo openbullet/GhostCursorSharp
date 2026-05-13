@@ -4,17 +4,19 @@ namespace GhostCursorSharp.Internal;
 
 internal sealed class GhostCursorScroller
 {
+    private readonly GhostCursorElementGeometry _geometry;
     private readonly GhostCursorState _state;
 
-    public GhostCursorScroller(GhostCursorState state)
+    public GhostCursorScroller(GhostCursorState state, GhostCursorElementGeometry geometry)
     {
         _state = state;
+        _geometry = geometry;
     }
 
     public async Task ScrollIntoViewAsync(IElementHandle element, ResolvedScrollIntoViewOptions options)
     {
         var viewport = await GetViewportMetricsAsync();
-        var elementBox = await GetBoundingBoxAsync(element);
+        var elementBox = await _geometry.GetElementBoxAsync(element);
         var box = ToBoxEdges(elementBox);
 
         var targetBox = new BoxEdges(
@@ -205,10 +207,6 @@ internal sealed class GhostCursorScroller
               scrollPositionLeft: window.scrollX
             })
             """);
-
-    private static async Task<BoundingBox> GetBoundingBoxAsync(IElementHandle element)
-        => await element.BoundingBoxAsync()
-           ?? throw new InvalidOperationException("Could not determine the element bounds.");
 
     private static BoxEdges ToBoxEdges(BoundingBox box)
         => new(
