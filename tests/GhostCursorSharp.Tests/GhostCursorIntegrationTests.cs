@@ -1,4 +1,5 @@
 using PuppeteerSharp;
+using System.Runtime.InteropServices;
 
 namespace GhostCursorSharp.Tests;
 
@@ -671,11 +672,16 @@ public class GhostCursorIntegrationTests
         var installedBrowser = browserFetcher.GetInstalledBrowsers().FirstOrDefault()
             ?? await browserFetcher.DownloadAsync();
 
+        string[] launchArguments = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? ["--no-sandbox", "--disable-setuid-sandbox"]
+            : [];
+
         return await Puppeteer.LaunchAsync(new LaunchOptions
         {
             Headless = true,
             ExecutablePath = installedBrowser.GetExecutablePath(),
-            DefaultViewport = null
+            DefaultViewport = null,
+            Args = launchArguments
         });
     }
 
