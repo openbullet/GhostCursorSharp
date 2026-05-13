@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>OpenBullet.GhostCursorSharp</PackageId>
     <Authors>openbullet</Authors>
     <Description>Human-like mouse movement generation and PuppeteerSharp cursor automation.</Description>
@@ -10,6 +11,8 @@
     <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
     <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;bezier</PackageTags>
+    <Version>0.1.0</Version>
+    <PackageReleaseNotes>Initial OpenBullet GhostCursorSharp package release.</PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
   </PropertyGroup>
