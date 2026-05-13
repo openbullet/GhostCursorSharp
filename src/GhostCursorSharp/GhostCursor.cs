@@ -358,11 +358,11 @@ public sealed class GhostCursor
         var resolvedOptions = _optionResolver.ResolveMoveOptions(options);
         await ExecuteActionAsync(async () =>
         {
-            var element = await _elementLocator.GetElementAsync(
-                selector,
-                new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
-
-            await _mover.MoveAsync(element, resolvedOptions);
+            await _mover.MoveAsync(
+                () => _elementLocator.GetElementAsync(
+                    selector,
+                    new ResolvedGetElementOptions(resolvedOptions.WaitForSelector)),
+                resolvedOptions);
         },
         async () => await GhostCursorTiming.DelayAsync(resolvedOptions.MoveDelay, resolvedOptions.RandomizeMoveDelay));
     }
@@ -402,11 +402,11 @@ public sealed class GhostCursor
         var resolvedOptions = _optionResolver.ResolveClickOptions(options);
         await ExecuteActionAsync(async () =>
         {
-            var element = await _elementLocator.GetElementAsync(
-                selector,
-                new ResolvedGetElementOptions(resolvedOptions.WaitForSelector));
-
-            await _mover.MoveAsync(element, resolvedOptions);
+            await _mover.MoveAsync(
+                () => _elementLocator.GetElementAsync(
+                    selector,
+                    new ResolvedGetElementOptions(resolvedOptions.WaitForSelector)),
+                resolvedOptions);
             await _mover.ClickAsync(resolvedOptions);
         });
     }

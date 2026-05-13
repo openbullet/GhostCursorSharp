@@ -79,35 +79,71 @@ internal sealed class GhostCursorMover
     }
 
     public async Task MoveAsync(IElementHandle element, ResolvedMoveOptions options)
+        => await MoveAsync(() => Task.FromResult(element), options, canReacquire: false);
+
+    public async Task MoveAsync(Func<Task<IElementHandle>> elementResolver, ResolvedMoveOptions options)
+        => await MoveAsync(elementResolver, options, canReacquire: true);
+
+    private async Task MoveAsync(
+        Func<Task<IElementHandle>> elementResolver,
+        ResolvedMoveOptions options,
+        bool canReacquire)
     {
+        Exception? lastException = null;
+
         for (var attempt = 0; attempt <= options.MaxTries; attempt++)
         {
-            await _scroller.ScrollIntoViewAsync(element, options);
-
-            var boundingBox = await _geometry.GetElementBoxAsync(element);
-            var destination = GetTargetPoint(boundingBox, options);
-
-            await MoveWithOvershootAsync(destination, options);
-
-            var updatedBoundingBox = await _geometry.GetElementBoxAsync(element);
-            if (IntersectsElement(_state.Location, updatedBoundingBox))
+            IElementHandle element;
+            try
             {
-                return;
+                element = await elementResolver();
+            }
+            catch (Exception ex) when (canReacquire && attempt < options.MaxTries)
+            {
+                lastException = ex;
+                continue;
             }
 
-            await MoveToAsync(
-                GetTargetPoint(updatedBoundingBox, options),
-                new PathOptions
+            try
+            {
+                await _scroller.ScrollIntoViewAsync(element, options);
+
+                var boundingBox = await _geometry.GetElementBoxAsync(element);
+                var destination = GetTargetPoint(boundingBox, options);
+
+                await MoveWithOvershootAsync(destination, options);
+
+                var updatedBoundingBox = await _geometry.GetElementBoxAsync(element);
+                if (IntersectsElement(_state.Location, updatedBoundingBox))
                 {
-                    MoveSpeed = options.MoveSpeed,
-                    SpreadOverride = OvershootSpread
-                },
-                options.DelayPerStep);
+                    return;
+                }
 
-            if (IntersectsElement(_state.Location, updatedBoundingBox))
-            {
-                return;
+                await MoveToAsync(
+                    GetTargetPoint(updatedBoundingBox, options),
+                    new PathOptions
+                    {
+                        MoveSpeed = options.MoveSpeed,
+                        SpreadOverride = OvershootSpread
+                    },
+                    options.DelayPerStep);
+
+                if (IntersectsElement(_state.Location, updatedBoundingBox))
+                {
+                    return;
+                }
             }
+            catch (Exception ex) when (canReacquire && attempt < options.MaxTries)
+            {
+                lastException = ex;
+            }
+        }
+
+        if (lastException is not null)
+        {
+            throw new InvalidOperationException(
+                "Could not move inside the element within the allowed number of attempts.",
+                lastException);
         }
 
         throw new InvalidOperationException("Could not move inside the element within the allowed number of attempts.");

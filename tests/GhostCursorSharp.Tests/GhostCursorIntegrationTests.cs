@@ -277,6 +277,127 @@ public class GhostCursorIntegrationTests
     }
 
     [Fact]
+    public async Task MoveAsync_WithSelector_ReacquiresElementWhenItIsReplaced()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0; overflow: hidden;">
+              <div
+                id="moving-box"
+                style="position: absolute; left: 520px; top: 80px; width: 80px; height: 80px; background: #eee;">
+              </div>
+              <script>
+                window.replacementCount = 0;
+                setTimeout(() => {
+                  const oldBox = document.querySelector('#moving-box');
+                  oldBox.remove();
+
+                  const newBox = document.createElement('div');
+                  newBox.id = 'moving-box';
+                  newBox.style.position = 'absolute';
+                  newBox.style.left = '160px';
+                  newBox.style.top = '280px';
+                  newBox.style.width = '80px';
+                  newBox.style.height = '80px';
+                  newBox.style.background = '#ccc';
+                  document.body.appendChild(newBox);
+
+                  window.replacementCount += 1;
+                }, 30);
+              </script>
+            </body>
+            </html>
+            """);
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            Start = new Vector(5, 5),
+            DefaultOptions = new DefaultOptions
+            {
+                Move = RetryMoveOptions()
+            }
+        });
+
+        await cursor.MoveAsync("#moving-box");
+
+        var endedInsideReplacement = await page.EvaluateFunctionAsync<bool>(
+            """
+            (point) => {
+              const rect = document.querySelector('#moving-box').getBoundingClientRect();
+              return point.x > rect.left &&
+                point.x <= rect.right &&
+                point.y > rect.top &&
+                point.y <= rect.bottom;
+            }
+            """,
+            new { x = cursor.Location.X, y = cursor.Location.Y });
+
+        Assert.True(await page.EvaluateExpressionAsync<bool>("window.replacementCount === 1"));
+        Assert.True(endedInsideReplacement);
+    }
+
+    [Fact]
+    public async Task ClickAsync_WithSelector_ReacquiresElementWhenItIsReplaced()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0; overflow: hidden;">
+              <button
+                id="replaceable-button"
+                style="position: absolute; left: 520px; top: 80px; width: 140px; height: 48px;">
+                Old button
+              </button>
+              <script>
+                window.replacementClicked = false;
+                window.buttonReplacementCount = 0;
+                setTimeout(() => {
+                  const oldButton = document.querySelector('#replaceable-button');
+                  oldButton.remove();
+
+                  const newButton = document.createElement('button');
+                  newButton.id = 'replaceable-button';
+                  newButton.textContent = 'New button';
+                  newButton.style.position = 'absolute';
+                  newButton.style.left = '180px';
+                  newButton.style.top = '320px';
+                  newButton.style.width = '140px';
+                  newButton.style.height = '48px';
+                  newButton.addEventListener('click', () => {
+                    window.replacementClicked = true;
+                  });
+                  document.body.appendChild(newButton);
+
+                  window.buttonReplacementCount += 1;
+                }, 30);
+              </script>
+            </body>
+            </html>
+            """);
+
+        var cursor = new GhostCursor(page, new GhostCursorOptions
+        {
+            Start = new Vector(5, 5),
+            DefaultOptions = new DefaultOptions
+            {
+                Click = RetryClickOptions()
+            }
+        });
+
+        await cursor.ClickAsync("#replaceable-button");
+
+        Assert.True(await page.EvaluateExpressionAsync<bool>("window.buttonReplacementCount === 1"));
+        Assert.True(await page.EvaluateExpressionAsync<bool>("window.replacementClicked"));
+    }
+
+    [Fact]
     public async Task ScrollApis_MoveTheViewport()
     {
         await using var browser = await LaunchBrowserAsync();
@@ -427,6 +548,36 @@ public class GhostCursorIntegrationTests
             ScrollDelay = 0,
             ScrollSpeed = 100,
             PaddingPercentage = 100
+        };
+
+    private static MoveOptions RetryMoveOptions()
+        => new()
+        {
+            MoveSpeed = 20,
+            MoveDelay = 0,
+            RandomizeMoveDelay = false,
+            DelayPerStep = 8,
+            ScrollDelay = 0,
+            ScrollSpeed = 100,
+            PaddingPercentage = 100,
+            OvershootThreshold = 10,
+            MaxTries = 2
+        };
+
+    private static ClickOptions RetryClickOptions()
+        => new()
+        {
+            MoveSpeed = 20,
+            MoveDelay = 0,
+            RandomizeMoveDelay = false,
+            DelayPerStep = 8,
+            ScrollDelay = 0,
+            ScrollSpeed = 100,
+            PaddingPercentage = 100,
+            OvershootThreshold = 10,
+            MaxTries = 2,
+            Hesitate = 0,
+            WaitForClick = 0
         };
 
     private static async Task LoadFixtureAsync(IPage page)
