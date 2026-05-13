@@ -43,6 +43,25 @@ public class GhostCursorIntegrationTests
     }
 
     [Fact]
+    public async Task GetElementAsync_WithElementHandle_ReturnsTheSameHandle()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadFixtureAsync(page);
+
+        var cursor = new GhostCursor(page);
+        var box = await page.QuerySelectorAsync("#box1")
+            ?? throw new InvalidOperationException("box1 not found");
+
+        var resolved = await cursor.GetElementAsync(box, new GetElementOptions
+        {
+            WaitForSelector = 1
+        });
+
+        Assert.Same(box, resolved);
+    }
+
+    [Fact]
     public async Task ClickAsync_ClicksElementWithCssSelector()
     {
         await using var browser = await LaunchBrowserAsync();
@@ -115,6 +134,51 @@ public class GhostCursorIntegrationTests
             new { x = cursor.Location.X, y = cursor.Location.Y });
 
         Assert.True(intersectsClientRect);
+    }
+
+    [Fact]
+    public async Task GetElementBoxAsync_UsesInlineElementGeometry()
+    {
+        await using var browser = await LaunchBrowserAsync();
+        await using var page = await browser.NewPageAsync();
+        await LoadContentAsync(
+            page,
+            """
+            <html lang="en">
+            <body style="margin: 0; font: 16px/1.4 sans-serif;">
+              <div style="width: 110px; margin: 48px;">
+                <a id="inline-link" href="#" style="color: #06c;">
+                  Ghost cursor should expose inline geometry through the public API as well.
+                </a>
+              </div>
+            </body>
+            </html>
+            """);
+
+        var cursor = new GhostCursor(page);
+        var inlineLink = await page.QuerySelectorAsync("#inline-link")
+            ?? throw new InvalidOperationException("inline-link not found");
+
+        var box = await cursor.GetElementBoxAsync(inlineLink);
+        var centerX = Convert.ToDouble(box.X + (box.Width / 2));
+        var centerY = Convert.ToDouble(box.Y + (box.Height / 2));
+
+        var centerIntersectsClientRect = await page.EvaluateFunctionAsync<bool>(
+            """
+            (point) => {
+              const rects = [...document.querySelector('#inline-link').getClientRects()];
+              return rects.some(rect =>
+                point.x > rect.left &&
+                point.x <= rect.right &&
+                point.y > rect.top &&
+                point.y <= rect.bottom);
+            }
+            """,
+            new { x = centerX, y = centerY });
+
+        Assert.True(box.Width > 0);
+        Assert.True(box.Height > 0);
+        Assert.True(centerIntersectsClientRect);
     }
 
     [Fact]

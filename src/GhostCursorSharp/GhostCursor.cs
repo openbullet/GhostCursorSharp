@@ -9,6 +9,7 @@ namespace GhostCursorSharp;
 public sealed class GhostCursor
 {
     private readonly GhostCursorElementLocator _elementLocator;
+    private readonly GhostCursorElementGeometry _geometry;
     private readonly GhostCursorMover _mover;
     private readonly GhostCursorOptionResolver _optionResolver;
     private readonly GhostCursorRandomMover _randomMover;
@@ -38,9 +39,9 @@ public sealed class GhostCursor
 
         _optionResolver = new GhostCursorOptionResolver(() => DefaultOptions);
         _elementLocator = new GhostCursorElementLocator(page);
-        var geometry = new GhostCursorElementGeometry(page);
-        _scroller = new GhostCursorScroller(_state, geometry);
-        _mover = new GhostCursorMover(_state, _scroller, geometry);
+        _geometry = new GhostCursorElementGeometry(page);
+        _scroller = new GhostCursorScroller(_state, _geometry);
+        _mover = new GhostCursorMover(_state, _scroller, _geometry);
         _randomMover = new GhostCursorRandomMover(_state, _mover, _scroller, _optionResolver);
 
         if (options?.Visible == true)
@@ -165,6 +166,29 @@ public sealed class GhostCursor
     /// <exception cref="InvalidOperationException">Thrown when the selector does not resolve to an element.</exception>
     public Task<IElementHandle> GetElementAsync(string selector, GetElementOptions? options = null)
         => _elementLocator.GetElementAsync(selector, _optionResolver.ResolveGetElementOptions(options));
+
+    /// <summary>
+    /// Returns the provided element handle unchanged.
+    /// </summary>
+    /// <param name="element">The existing element handle.</param>
+    /// <param name="options">Optional selector wait settings. Ignored when a handle is already provided.</param>
+    /// <returns>The same <paramref name="element"/> instance.</returns>
+    public Task<IElementHandle> GetElementAsync(IElementHandle element, GetElementOptions? options = null)
+    {
+        _ = _optionResolver.ResolveGetElementOptions(options);
+        return Task.FromResult(element);
+    }
+
+    /// <summary>
+    /// Resolves the element box using the same geometry fallbacks used by cursor movement.
+    /// </summary>
+    /// <param name="element">The element whose box should be resolved.</param>
+    /// <param name="relativeToMainFrame">
+    /// When <see langword="true"/>, return coordinates relative to the main frame; otherwise adjust child-frame boxes.
+    /// </param>
+    /// <returns>The resolved element box.</returns>
+    public Task<BoundingBox> GetElementBoxAsync(IElementHandle element, bool relativeToMainFrame = true)
+        => _geometry.GetElementBoxAsync(element, relativeToMainFrame);
 
     /// <summary>
     /// Scrolls the first matching element into view if needed.
