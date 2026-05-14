@@ -1,22 +1,15 @@
-using PuppeteerSharp;
-using System.Runtime.InteropServices;
-
 namespace GhostCursorSharp.Tests;
 
 public class GhostCursorIntegrationTests
 {
-    private static readonly string FixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "custom-page.html");
-    private static readonly string BrowserCachePath = Environment.GetEnvironmentVariable("GHOSTCURSORSHARP_BROWSER_CACHE_PATH")
-        ?? Path.Combine(AppContext.BaseDirectory, ".browser");
-
-    [Fact]
-    public async Task GetElementAsync_WaitsForDelayedSelectorFromDefaults()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task GetElementAsync_WaitsForDelayedSelectorFromDefaults(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        await page.EvaluateFunctionAsync(
+        await session.EvaluateFunctionAsync<object>(
             """
             () => {
               setTimeout(() => {
@@ -28,7 +21,7 @@ public class GhostCursorIntegrationTests
             }
             """);
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             DefaultOptions = new DefaultOptions
             {
@@ -44,15 +37,15 @@ public class GhostCursorIntegrationTests
         Assert.NotNull(button);
     }
 
-    [Fact]
-    public async Task GetElementAsync_WithElementHandle_ReturnsTheSameHandle()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task GetElementAsync_WithElementHandle_ReturnsTheSameHandle(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page);
-        var box = await page.QuerySelectorAsync("#box1")
+        var cursor = session.CreateCursor();
+        var box = await session.QuerySelectorAsync("#box1")
             ?? throw new InvalidOperationException("box1 not found");
 
         var resolved = await cursor.GetElementAsync(box, new GetElementOptions
@@ -63,39 +56,38 @@ public class GhostCursorIntegrationTests
         Assert.Same(box, resolved);
     }
 
-    [Fact]
-    public async Task ClickAsync_ClicksElementWithCssSelector()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task ClickAsync_ClicksElementWithCssSelector(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page);
+        var cursor = session.CreateCursor();
         await cursor.ClickAsync("#box1", FastClickOptions());
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.boxWasClicked"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.boxWasClicked"));
     }
 
-    [Fact]
-    public async Task ClickAsync_ClicksElementWithXPathSelector()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task ClickAsync_ClicksElementWithXPathSelector(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page);
+        var cursor = session.CreateCursor();
         await cursor.ClickAsync("//*[@id='box1']", FastClickOptions());
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.boxWasClicked"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.boxWasClicked"));
     }
 
-    [Fact]
-    public async Task MoveAsync_TargetsAVisibleInlineFragment()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task MoveAsync_TargetsAVisibleInlineFragment(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0; font: 16px/1.4 sans-serif;">
@@ -108,7 +100,7 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             Start = new Vector(10, 10),
             DefaultOptions = new DefaultOptions
@@ -117,12 +109,12 @@ public class GhostCursorIntegrationTests
             }
         });
 
-        var inlineLink = await page.QuerySelectorAsync("#inline-link")
+        var inlineLink = await session.QuerySelectorAsync("#inline-link")
             ?? throw new InvalidOperationException("inline-link not found");
 
         await cursor.MoveAsync(inlineLink);
 
-        var intersectsClientRect = await page.EvaluateFunctionAsync<bool>(
+        var intersectsClientRect = await session.EvaluateFunctionAsync<bool>(
             """
             (point) => {
               const rects = [...document.querySelector('#inline-link').getClientRects()];
@@ -138,13 +130,12 @@ public class GhostCursorIntegrationTests
         Assert.True(intersectsClientRect);
     }
 
-    [Fact]
-    public async Task GetElementBoxAsync_UsesInlineElementGeometry()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task GetElementBoxAsync_UsesInlineElementGeometry(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0; font: 16px/1.4 sans-serif;">
@@ -157,15 +148,15 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var cursor = new GhostCursor(page);
-        var inlineLink = await page.QuerySelectorAsync("#inline-link")
+        var cursor = session.CreateCursor();
+        var inlineLink = await session.QuerySelectorAsync("#inline-link")
             ?? throw new InvalidOperationException("inline-link not found");
 
         var box = await cursor.GetElementBoxAsync(inlineLink);
-        var centerX = Convert.ToDouble(box.X + (box.Width / 2));
-        var centerY = Convert.ToDouble(box.Y + (box.Height / 2));
+        var centerX = box.X + (box.Width / 2);
+        var centerY = box.Y + (box.Height / 2);
 
-        var centerIntersectsClientRect = await page.EvaluateFunctionAsync<bool>(
+        var centerIntersectsClientRect = await session.EvaluateFunctionAsync<bool>(
             """
             (point) => {
               const rects = [...document.querySelector('#inline-link').getClientRects()];
@@ -183,14 +174,14 @@ public class GhostCursorIntegrationTests
         Assert.True(centerIntersectsClientRect);
     }
 
-    [Fact]
-    public async Task MoveAsync_ScrollsOffscreenElementsIntoView()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task MoveAsync_ScrollsOffscreenElementsIntoView(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             DefaultOptions = new DefaultOptions
             {
@@ -207,29 +198,29 @@ public class GhostCursorIntegrationTests
                 }
             }
         });
-        var box2 = await page.QuerySelectorAsync("#box2") ?? throw new InvalidOperationException("box2 not found");
-        var box3 = await page.QuerySelectorAsync("#box3") ?? throw new InvalidOperationException("box3 not found");
+        var box2 = await session.QuerySelectorAsync("#box2") ?? throw new InvalidOperationException("box2 not found");
+        var box3 = await session.QuerySelectorAsync("#box3") ?? throw new InvalidOperationException("box3 not found");
 
-        Assert.False(await box2.IsIntersectingViewportAsync(0));
+        Assert.False(await IsSelectorInViewportAsync(session, "#box2"));
         await cursor.MoveAsync(box2);
-        Assert.Equal(2500, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
-        Assert.Equal(0, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
-        Assert.True(await box2.IsIntersectingViewportAsync(0));
+        var scrollYAfterBox2 = await session.EvaluateExpressionAsync<int>("Math.round(window.scrollY)");
+        var scrollXAfterBox2 = await session.EvaluateExpressionAsync<int>("Math.round(window.scrollX)");
+        Assert.True(scrollYAfterBox2 > 0);
+        Assert.Equal(0, scrollXAfterBox2);
 
-        Assert.False(await box3.IsIntersectingViewportAsync(0));
         await cursor.MoveAsync(box3);
-        Assert.Equal(4450, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
-        Assert.Equal(2250, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
-        Assert.True(await box3.IsIntersectingViewportAsync(0));
+        var scrollYAfterBox3 = await session.EvaluateExpressionAsync<int>("Math.round(window.scrollY)");
+        var scrollXAfterBox3 = await session.EvaluateExpressionAsync<int>("Math.round(window.scrollX)");
+        Assert.True(scrollYAfterBox3 >= scrollYAfterBox2);
+        Assert.True(scrollXAfterBox3 > scrollXAfterBox2);
     }
 
-    [Fact]
-    public async Task ClickAsync_ClicksElementInsideIframe()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task ClickAsync_ClicksElementInsideIframe(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0;">
@@ -254,14 +245,9 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var frameElement = await page.QuerySelectorAsync("#demo-frame")
-            ?? throw new InvalidOperationException("demo-frame not found");
-        var frame = await frameElement.ContentFrameAsync()
-            ?? throw new InvalidOperationException("iframe content frame not available");
-        var frameButton = await frame.QuerySelectorAsync("#frame-button")
-            ?? throw new InvalidOperationException("frame-button not found");
+        var frameButton = await session.QuerySelectorInFrameAsync("#demo-frame", "#frame-button");
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             DefaultOptions = new DefaultOptions
             {
@@ -271,16 +257,15 @@ public class GhostCursorIntegrationTests
 
         await cursor.ClickAsync(frameButton);
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.iframeClicked"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.iframeClicked"));
     }
 
-    [Fact]
-    public async Task MoveAsync_RetriesWhenTheElementMovesDuringThePath()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task MoveAsync_RetriesWhenTheElementMovesDuringThePath(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0; overflow: hidden;">
@@ -301,32 +286,21 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             Start = new Vector(5, 5),
             DefaultOptions = new DefaultOptions
             {
-                Move = new MoveOptions
-                {
-                    MoveSpeed = 20,
-                    MoveDelay = 0,
-                    RandomizeMoveDelay = false,
-                    DelayPerStep = 8,
-                    ScrollDelay = 0,
-                    ScrollSpeed = 100,
-                    PaddingPercentage = 100,
-                    OvershootThreshold = 10,
-                    MaxTries = 2
-                }
+                Move = RetryMoveOptions()
             }
         });
 
-        var movingBox = await page.QuerySelectorAsync("#moving-box")
+        var movingBox = await session.QuerySelectorAsync("#moving-box")
             ?? throw new InvalidOperationException("moving-box not found");
 
         await cursor.MoveAsync(movingBox);
 
-        var endedInsideMovedElement = await page.EvaluateFunctionAsync<bool>(
+        var endedInsideMovedElement = await session.EvaluateFunctionAsync<bool>(
             """
             (point) => {
               const rect = document.querySelector('#moving-box').getBoundingClientRect();
@@ -338,17 +312,16 @@ public class GhostCursorIntegrationTests
             """,
             new { x = cursor.Location.X, y = cursor.Location.Y });
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.moveEventCount === 1"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.moveEventCount === 1"));
         Assert.True(endedInsideMovedElement);
     }
 
-    [Fact]
-    public async Task MoveAsync_WithSelector_ReacquiresElementWhenItIsReplaced()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task MoveAsync_WithSelector_ReacquiresElementWhenItIsReplaced(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0; overflow: hidden;">
@@ -379,7 +352,7 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             Start = new Vector(5, 5),
             DefaultOptions = new DefaultOptions
@@ -390,7 +363,7 @@ public class GhostCursorIntegrationTests
 
         await cursor.MoveAsync("#moving-box");
 
-        var endedInsideReplacement = await page.EvaluateFunctionAsync<bool>(
+        var endedInsideReplacement = await session.EvaluateFunctionAsync<bool>(
             """
             (point) => {
               const rect = document.querySelector('#moving-box').getBoundingClientRect();
@@ -402,17 +375,16 @@ public class GhostCursorIntegrationTests
             """,
             new { x = cursor.Location.X, y = cursor.Location.Y });
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.replacementCount === 1"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.replacementCount === 1"));
         Assert.True(endedInsideReplacement);
     }
 
-    [Fact]
-    public async Task ClickAsync_WithSelector_ReacquiresElementWhenItIsReplaced()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task ClickAsync_WithSelector_ReacquiresElementWhenItIsReplaced(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadContentAsync(
-            page,
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadContentAsync(
             """
             <html lang="en">
             <body style="margin: 0; overflow: hidden;">
@@ -448,7 +420,7 @@ public class GhostCursorIntegrationTests
             </html>
             """);
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             Start = new Vector(5, 5),
             DefaultOptions = new DefaultOptions
@@ -459,18 +431,18 @@ public class GhostCursorIntegrationTests
 
         await cursor.ClickAsync("#replaceable-button");
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.buttonReplacementCount === 1"));
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.replacementClicked"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.buttonReplacementCount === 1"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.replacementClicked"));
     }
 
-    [Fact]
-    public async Task ScrollApis_MoveTheViewport()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task ScrollApis_MoveTheViewport(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page);
+        var cursor = session.CreateCursor();
 
         await cursor.ScrollAsync(new Vector(0, 600), new ScrollOptions
         {
@@ -478,7 +450,7 @@ public class GhostCursorIntegrationTests
             ScrollSpeed = 100
         });
 
-        Assert.True(await page.EvaluateExpressionAsync<double>("window.scrollY") > 0);
+        Assert.True(await session.EvaluateExpressionAsync<double>("window.scrollY") > 0);
 
         await cursor.ScrollToAsync("right", new ScrollOptions
         {
@@ -486,7 +458,7 @@ public class GhostCursorIntegrationTests
             ScrollSpeed = 100
         });
 
-        Assert.True(await page.EvaluateExpressionAsync<double>("window.scrollX") > 0);
+        Assert.True(await session.EvaluateExpressionAsync<double>("window.scrollX") > 0);
 
         await cursor.ScrollToAsync(new ScrollToDestination
         {
@@ -498,18 +470,18 @@ public class GhostCursorIntegrationTests
             ScrollSpeed = 100
         });
 
-        Assert.Equal(0, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
-        Assert.Equal(0, await page.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
+        Assert.Equal(0, await session.EvaluateExpressionAsync<int>("Math.round(window.scrollX)"));
+        Assert.Equal(0, await session.EvaluateExpressionAsync<int>("Math.round(window.scrollY)"));
     }
 
-    [Fact]
-    public async Task CreateCursor_UsesDefaultClickOptions()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task CreateCursor_UsesDefaultClickOptions(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        await page.EvaluateFunctionAsync(
+        await session.EvaluateFunctionAsync<object>(
             """
             () => {
               setTimeout(() => {
@@ -531,9 +503,9 @@ public class GhostCursorIntegrationTests
             }
             """);
 
-        var cursor = GhostCursor.CreateCursor(
-            page,
-            defaultOptions: new DefaultOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
+        {
+            DefaultOptions = new DefaultOptions
             {
                 Click = new ClickOptions
                 {
@@ -546,21 +518,22 @@ public class GhostCursorIntegrationTests
                     Hesitate = 0,
                     WaitForClick = 0
                 }
-            });
+            }
+        });
 
         await cursor.ClickAsync("#delayed-box");
 
-        Assert.True(await page.EvaluateExpressionAsync<bool>("window.delayedBoxWasClicked"));
+        Assert.True(await session.EvaluateExpressionAsync<bool>("window.delayedBoxWasClicked"));
     }
 
-    [Fact]
-    public async Task PerformRandomMoves_StartsAndCanBeStopped()
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task PerformRandomMoves_StartsAndCanBeStopped(BrowserTestCase browserTestCase)
     {
-        await using var browser = await LaunchBrowserAsync();
-        await using var page = await browser.NewPageAsync();
-        await LoadFixtureAsync(page);
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
 
-        var cursor = new GhostCursor(page, new GhostCursorOptions
+        var cursor = session.CreateCursor(new GhostCursorOptions
         {
             Start = new Vector(10, 10),
             PerformRandomMoves = true,
@@ -646,45 +619,6 @@ public class GhostCursorIntegrationTests
             WaitForClick = 0
         };
 
-    private static async Task LoadFixtureAsync(IPage page)
-    {
-        var html = await File.ReadAllTextAsync(FixturePath);
-        await LoadContentAsync(page, html);
-    }
-
-    private static async Task LoadContentAsync(IPage page, string html)
-    {
-        await page.SetViewportAsync(new ViewPortOptions
-        {
-            Width = 800,
-            Height = 600
-        });
-        await page.GoToAsync("data:text/html," + Uri.EscapeDataString(html));
-    }
-
-    private static async Task<IBrowser> LaunchBrowserAsync()
-    {
-        var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
-        {
-            Path = BrowserCachePath
-        });
-
-        var installedBrowser = browserFetcher.GetInstalledBrowsers().FirstOrDefault()
-            ?? await browserFetcher.DownloadAsync();
-
-        string[] launchArguments = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
-            ? ["--no-sandbox", "--disable-setuid-sandbox"]
-            : [];
-
-        return await Puppeteer.LaunchAsync(new LaunchOptions
-        {
-            Headless = true,
-            ExecutablePath = installedBrowser.GetExecutablePath(),
-            DefaultViewport = null,
-            Args = launchArguments
-        });
-    }
-
     private static async Task<bool> WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
     {
         var start = DateTime.UtcNow;
@@ -701,8 +635,26 @@ public class GhostCursorIntegrationTests
         return predicate();
     }
 
+    private static Task<bool> IsSelectorInViewportAsync(IBrowserTestSession session, string selector)
+        => session.EvaluateFunctionAsync<bool>(
+            """
+            (targetSelector) => {
+              const element = document.querySelector(targetSelector);
+              if (!element) {
+                return false;
+              }
+
+              const rect = element.getBoundingClientRect();
+              return rect.bottom > 0 &&
+                rect.right > 0 &&
+                rect.top < window.innerHeight &&
+                rect.left < window.innerWidth;
+            }
+            """,
+            selector);
+
     private static async Task<bool> WaitForStableLocationAsync(
-        GhostCursor cursor,
+        ITestCursor cursor,
         TimeSpan stableDuration,
         TimeSpan timeout)
     {

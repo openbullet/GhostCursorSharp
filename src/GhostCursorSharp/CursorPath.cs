@@ -1,4 +1,5 @@
 using PuppeteerSharp;
+using PlaywrightBoundingBox = Microsoft.Playwright.ElementHandleBoundingBoxResult;
 
 namespace GhostCursorSharp;
 
@@ -59,6 +60,35 @@ public static class CursorPath
         => Generate(start, end, new PathOptions { SpreadOverride = spreadOverride });
 
     /// <summary>
+    /// Generates a human-like path from a coordinate to a Playwright bounding box target.
+    /// </summary>
+    /// <param name="start">The starting coordinate.</param>
+    /// <param name="end">The target bounding box whose origin is used as the destination.</param>
+    /// <param name="options">Optional path generation settings.</param>
+    /// <returns>A sequence of cursor points describing the movement.</returns>
+    public static IReadOnlyList<Vector> Generate(Vector start, PlaywrightBoundingBox end, PathOptions? options = null)
+        => Generate(
+            start,
+            new BoundingBox
+            {
+                X = Convert.ToDecimal(end.X),
+                Y = Convert.ToDecimal(end.Y),
+                Width = Convert.ToDecimal(end.Width),
+                Height = Convert.ToDecimal(end.Height)
+            },
+            options);
+
+    /// <summary>
+    /// Generates a human-like path from a coordinate to a Playwright bounding box target using a specific Bezier spread.
+    /// </summary>
+    /// <param name="start">The starting coordinate.</param>
+    /// <param name="end">The target bounding box whose origin is used as the destination.</param>
+    /// <param name="spreadOverride">The spread to use when generating Bezier anchors.</param>
+    /// <returns>A sequence of cursor points describing the movement.</returns>
+    public static IReadOnlyList<Vector> Generate(Vector start, PlaywrightBoundingBox end, double spreadOverride)
+        => Generate(start, end, new PathOptions { SpreadOverride = spreadOverride });
+
+    /// <summary>
     /// Generates a human-like timed path between two coordinates.
     /// </summary>
     /// <param name="start">The starting coordinate.</param>
@@ -96,6 +126,26 @@ public static class CursorPath
     /// <param name="spreadOverride">The spread to use when generating Bezier anchors.</param>
     /// <returns>A sequence of cursor points with Unix timestamps in milliseconds.</returns>
     public static IReadOnlyList<TimedVector> GenerateTimed(Vector start, BoundingBox end, double spreadOverride)
+        => GenerateTimed(start, end, new PathOptions { SpreadOverride = spreadOverride });
+
+    /// <summary>
+    /// Generates a human-like timed path from a coordinate to a Playwright bounding box target.
+    /// </summary>
+    /// <param name="start">The starting coordinate.</param>
+    /// <param name="end">The target bounding box whose origin is used as the destination.</param>
+    /// <param name="options">Optional path generation settings.</param>
+    /// <returns>A sequence of cursor points with Unix timestamps in milliseconds.</returns>
+    public static IReadOnlyList<TimedVector> GenerateTimed(Vector start, PlaywrightBoundingBox end, PathOptions? options = null)
+        => GenerateTimestamps(Generate(start, end, options), options);
+
+    /// <summary>
+    /// Generates a human-like timed path from a coordinate to a Playwright bounding box target using a specific Bezier spread.
+    /// </summary>
+    /// <param name="start">The starting coordinate.</param>
+    /// <param name="end">The target bounding box whose origin is used as the destination.</param>
+    /// <param name="spreadOverride">The spread to use when generating Bezier anchors.</param>
+    /// <returns>A sequence of cursor points with Unix timestamps in milliseconds.</returns>
+    public static IReadOnlyList<TimedVector> GenerateTimed(Vector start, PlaywrightBoundingBox end, double spreadOverride)
         => GenerateTimed(start, end, new PathOptions { SpreadOverride = spreadOverride });
 
     private static IReadOnlyList<Vector> GenerateVectors(Vector start, Vector end, double width, PathOptions? options)

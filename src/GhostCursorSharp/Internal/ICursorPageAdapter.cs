@@ -5,6 +5,8 @@ namespace GhostCursorSharp.Internal;
 
 internal interface ICursorPageAdapter
 {
+    string CreateXPathSelector(string selector);
+
     Task WaitForSelectorAsync(string selector, int timeoutMilliseconds);
 
     Task<ICursorElementHandle?> QuerySelectorAsync(string selector);

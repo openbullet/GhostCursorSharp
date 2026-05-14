@@ -1,4 +1,5 @@
 using PuppeteerSharp;
+using PlaywrightPage = Microsoft.Playwright.IPage;
 
 namespace GhostCursorSharp;
 
@@ -185,6 +186,34 @@ public static class MouseHelper
         var scriptIdentifier = await page.EvaluateExpressionOnNewDocumentAsync(Script);
         await page.EvaluateExpressionAsync(Script);
 
-        return new MouseHelperInstallation(page, scriptIdentifier.Identifier);
+        return new MouseHelperInstallation(async () =>
+        {
+            await page.EvaluateExpressionAsync("""
+                (() => {
+                  window.__ghostCursorRemoveMouseHelper?.();
+                })();
+                """);
+
+            await page.RemoveScriptToEvaluateOnNewDocumentAsync(scriptIdentifier.Identifier);
+        });
+    }
+
+    /// <summary>
+    /// Installs a visual mouse helper into the current Playwright document.
+    /// </summary>
+    /// <param name="page">The Playwright page to decorate with the visual mouse helper.</param>
+    /// <returns>An installation handle that can remove the helper later.</returns>
+    public static async Task<MouseHelperInstallation> InstallAsync(PlaywrightPage page)
+    {
+        await page.EvaluateAsync(Script);
+
+        return new MouseHelperInstallation(async () =>
+        {
+            await page.EvaluateAsync("""
+                (() => {
+                  window.__ghostCursorRemoveMouseHelper?.();
+                })();
+                """);
+        });
     }
 }

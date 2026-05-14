@@ -1,5 +1,3 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp;
 
 /// <summary>
@@ -7,14 +5,12 @@ namespace GhostCursorSharp;
 /// </summary>
 public sealed class MouseHelperInstallation : IAsyncDisposable
 {
-    private readonly IPage _page;
-    private readonly string _scriptIdentifier;
+    private readonly Func<Task> _remove;
     private bool _removed;
 
-    internal MouseHelperInstallation(IPage page, string scriptIdentifier)
+    internal MouseHelperInstallation(Func<Task> remove)
     {
-        _page = page;
-        _scriptIdentifier = scriptIdentifier;
+        _remove = remove;
     }
 
     /// <summary>
@@ -29,14 +25,7 @@ public sealed class MouseHelperInstallation : IAsyncDisposable
         }
 
         _removed = true;
-
-        await _page.EvaluateExpressionAsync("""
-            (() => {
-              window.__ghostCursorRemoveMouseHelper?.();
-            })();
-            """);
-
-        await _page.RemoveScriptToEvaluateOnNewDocumentAsync(_scriptIdentifier);
+        await _remove();
     }
 
     /// <inheritdoc />

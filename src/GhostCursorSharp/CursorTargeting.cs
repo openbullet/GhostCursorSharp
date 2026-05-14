@@ -1,4 +1,5 @@
 using PuppeteerSharp;
+using PlaywrightBoundingBox = Microsoft.Playwright.ElementHandleBoundingBoxResult;
 
 namespace GhostCursorSharp;
 
@@ -40,4 +41,21 @@ public static class CursorTargeting
             x + (paddingWidth / 2) + (Random.Shared.NextDouble() * (width - paddingWidth)),
             y + (paddingHeight / 2) + (Random.Shared.NextDouble() * (height - paddingHeight)));
     }
+
+    /// <summary>
+    /// Resolves a target point inside the provided Playwright bounding box.
+    /// </summary>
+    /// <param name="boundingBox">The Playwright bounding box to target.</param>
+    /// <param name="options">Optional targeting settings.</param>
+    /// <returns>A point inside the bounding box.</returns>
+    public static Vector GetPointInBox(PlaywrightBoundingBox boundingBox, BoxOptions? options = null)
+        => GetPointInBox(
+            new BoundingBox
+            {
+                X = Convert.ToDecimal(boundingBox.X),
+                Y = Convert.ToDecimal(boundingBox.Y),
+                Width = Convert.ToDecimal(boundingBox.Width),
+                Height = Convert.ToDecimal(boundingBox.Height)
+            },
+            options);
 }

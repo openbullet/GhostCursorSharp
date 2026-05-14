@@ -14,7 +14,7 @@ internal sealed class GhostCursorElementLocator
         if (selector.StartsWith("//", StringComparison.Ordinal) ||
             selector.StartsWith("(//", StringComparison.Ordinal))
         {
-            var xpathSelector = $"xpath/.{selector}";
+            var xpathSelector = _page.CreateXPathSelector(selector);
 
             if (options.WaitForSelector is not null)
             {

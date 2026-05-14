@@ -11,6 +11,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       GHOSTCURSORSHARP_BROWSER_CACHE_PATH: ${{ github.workspace }}/.browser
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
 
     steps:
     - uses: actions/checkout@v4
@@ -28,11 +29,22 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-ghostcursorsharp-browser-
 
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+        key: ${{ runner.os }}-ghostcursorsharp-playwright-${{ hashFiles('tests/GhostCursorSharp.Tests/GhostCursorIntegrationTests.cs', 'tests/GhostCursorSharp.Tests/GhostCursorSharp.Tests.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-ghostcursorsharp-playwright-
+
     - name: Restore
       run: dotnet restore GhostCursorSharp.slnx
 
     - name: Build
       run: dotnet build GhostCursorSharp.slnx --configuration Release --no-restore
+
+    - name: Install Playwright browsers
+      run: pwsh tests/GhostCursorSharp.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium firefox
 
     - name: Test
       run: dotnet test GhostCursorSharp.slnx --configuration Release --no-build

@@ -16,6 +16,9 @@ internal sealed class PuppeteerCursorPageAdapter : ICursorPageAdapter
             Timeout = timeoutMilliseconds
         });
 
+    public string CreateXPathSelector(string selector)
+        => $"xpath/.{selector}";
+
     public async Task<ICursorElementHandle?> QuerySelectorAsync(string selector)
     {
         var element = await _page.QuerySelectorAsync(selector);

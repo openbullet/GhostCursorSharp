@@ -6,11 +6,11 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>Ruri.GhostCursorSharp</PackageId>
     <Authors>openbullet</Authors>
-    <Description>Human-like mouse movement generation and PuppeteerSharp cursor automation.</Description>
+    <Description>Human-like mouse movement generation with PuppeteerSharp and Playwright cursor automation.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
-    <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;bezier</PackageTags>
+    <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;playwright;bezier</PackageTags>
     <Version>0.1.0</Version>
     <PackageReleaseNotes>Initial OpenBullet GhostCursorSharp package release.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -19,6 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
     <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117">
       <PrivateAssets>all</PrivateAssets>

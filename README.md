@@ -1,8 +1,8 @@
 # GhostCursorSharp
 
-`GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp`.
+`GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp` and `Microsoft.Playwright`.
 
-It generates human-like mouse paths between coordinates and provides a browser-facing `GhostCursor` API for moving, clicking, scrolling, and debugging cursor movement in Chromium.
+It generates human-like mouse paths between coordinates and provides browser-facing cursor APIs for moving, clicking, scrolling, and debugging cursor movement across Puppeteer and Playwright pages.
 
 ## Installation
 
@@ -22,7 +22,7 @@ dotnet restore GhostCursorSharp.slnx
 
 Implemented today:
 - Path generation with `CursorPath.Generate(...)` and `CursorPath.GenerateTimed(...)`
-- `GhostCursor` movement and click APIs
+- `GhostCursor` and `PlaywrightGhostCursor` movement and click APIs
 - Selector lookup with CSS and XPath
 - `scroll`, `scrollTo`, and `scrollIntoView`
 - Random movement with `PerformRandomMoves` and `ToggleRandomMove(...)`
@@ -77,6 +77,26 @@ await using var page = await browser.NewPageAsync();
 await page.GoToAsync("https://example.com");
 
 var cursor = new GhostCursor(page);
+
+await cursor.ClickAsync("a");
+```
+
+Use it with `Microsoft.Playwright`:
+
+```csharp
+using GhostCursorSharp;
+using Microsoft.Playwright;
+
+using var playwright = await Playwright.CreateAsync();
+await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+{
+    Headless = false
+});
+
+var page = await browser.NewPageAsync();
+await page.GotoAsync("https://example.com");
+
+var cursor = new PlaywrightGhostCursor(page);
 
 await cursor.ClickAsync("a");
 ```
@@ -146,12 +166,42 @@ var cursor = new GhostCursor(page, new GhostCursorOptions
 - `Visible`: installs the mouse helper immediately.
 - `DefaultOptions`: default options applied to actions like `click`, `move`, `scroll`, and `getElement`.
 
+### `new PlaywrightGhostCursor(page, start?)`
+
+```csharp
+var cursor = new PlaywrightGhostCursor(page);
+var cursorWithStart = new PlaywrightGhostCursor(page, new Vector(100, 100));
+```
+
+Creates a cursor bound to a `Microsoft.Playwright.IPage`.
+
+### `new PlaywrightGhostCursor(page, options)`
+
+```csharp
+var cursor = new PlaywrightGhostCursor(page, new GhostCursorOptions
+{
+    Start = new Vector(100, 100),
+    Visible = true,
+    DefaultOptions = new DefaultOptions()
+});
+```
+
+Supports the same option model as the Puppeteer facade.
+
 ### `GhostCursor.CreateCursor(page, start?, defaultOptions?, visible?)`
 
 Compatibility-oriented factory:
 
 ```csharp
 var cursor = GhostCursor.CreateCursor(page, visible: true);
+```
+
+### `PlaywrightGhostCursor.CreateCursor(page, start?, defaultOptions?, visible?)`
+
+Compatibility-oriented factory for Playwright:
+
+```csharp
+var cursor = PlaywrightGhostCursor.CreateCursor(page, visible: true);
 ```
 
 ### `GetLocation(): Vector`
@@ -312,7 +362,7 @@ Run the included demo:
 dotnet run --project .\src\GhostCursorSharp.Demo\GhostCursorSharp.Demo.csproj
 ```
 
-That demo opens Chromium headful, installs the visual mouse helper, and lets you choose scenario-driven tours for movement, clicking, press/release, scrolling, and random motion.
+That demo lets you choose `Puppeteer - Chromium`, `Playwright - Chromium`, or `Playwright - Firefox`, then runs scenario-driven tours for movement, clicking, press/release, scrolling, and random motion with the visual mouse helper enabled.
 
 ## Attribution
 

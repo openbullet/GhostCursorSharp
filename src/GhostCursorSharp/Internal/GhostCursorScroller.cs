@@ -1,4 +1,5 @@
 using PuppeteerSharp;
+using System.Text.Json;
 
 namespace GhostCursorSharp.Internal;
 
@@ -17,18 +18,8 @@ internal sealed class GhostCursorScroller
     {
         var viewport = await GetViewportMetricsAsync();
         var elementBox = await _geometry.GetElementBoxAsync(element);
-        var box = ToBoxEdges(elementBox);
-
-        var targetBox = new BoxEdges(
-            Top: Math.Max(box.Top - options.InViewportMargin + viewport.ScrollPositionTop, 0) - viewport.ScrollPositionTop,
-            Left: Math.Max(box.Left - options.InViewportMargin + viewport.ScrollPositionLeft, 0) - viewport.ScrollPositionLeft,
-            Bottom: Math.Min(box.Bottom + options.InViewportMargin + viewport.ScrollPositionTop, viewport.DocumentHeight) - viewport.ScrollPositionTop,
-            Right: Math.Min(box.Right + options.InViewportMargin + viewport.ScrollPositionLeft, viewport.DocumentWidth) - viewport.ScrollPositionLeft);
-
-        var isInViewport = targetBox.Top >= 0 &&
-                           targetBox.Left >= 0 &&
-                           targetBox.Bottom <= viewport.ViewportHeight &&
-                           targetBox.Right <= viewport.ViewportWidth;
+        var targetBox = ToBoxEdges(elementBox);
+        var isInViewport = await IsElementInViewportAsync(element, options.InViewportMargin);
 
         if (isInViewport)
         {
@@ -67,6 +58,16 @@ internal sealed class GhostCursorScroller
             }
 
             await ScrollAsync(new Vector(deltaX, deltaY), options);
+
+            var isNowInViewport = await IsElementInViewportAsync(element, options.InViewportMargin);
+
+            if (!isNowInViewport)
+            {
+                await element.EvaluateFunctionAsync(
+                    "(e, smooth) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: smooth ? 'smooth' : 'auto' })",
+                    options.ScrollSpeed < 90);
+                await GhostCursorTiming.DelayAsync(options.ScrollDelay);
+            }
         }
         catch
         {
@@ -193,7 +194,8 @@ internal sealed class GhostCursorScroller
     }
 
     private async Task<ViewportMetrics> GetViewportMetricsAsync()
-        => await _state.Page.EvaluateFunctionAsync<ViewportMetrics>(
+    {
+        var metrics = await _state.Page.EvaluateFunctionAsync<JsonElement>(
             """
             () => ({
               viewportWidth: window.innerWidth,
@@ -205,12 +207,34 @@ internal sealed class GhostCursorScroller
             })
             """);
 
+        return new ViewportMetrics(
+            ViewportWidth: metrics.GetProperty("viewportWidth").GetDouble(),
+            ViewportHeight: metrics.GetProperty("viewportHeight").GetDouble(),
+            DocumentHeight: metrics.GetProperty("documentHeight").GetDouble(),
+            DocumentWidth: metrics.GetProperty("documentWidth").GetDouble(),
+            ScrollPositionTop: metrics.GetProperty("scrollPositionTop").GetDouble(),
+            ScrollPositionLeft: metrics.GetProperty("scrollPositionLeft").GetDouble());
+    }
+
     private static BoxEdges ToBoxEdges(BoundingBox box)
         => new(
             Top: Convert.ToDouble(box.Y),
             Left: Convert.ToDouble(box.X),
             Bottom: Convert.ToDouble(box.Y + box.Height),
             Right: Convert.ToDouble(box.X + box.Width));
+
+    private static Task<bool> IsElementInViewportAsync(ICursorElementHandle element, double margin)
+        => element.EvaluateFunctionAsync<bool>(
+            """
+            (e, safeMargin) => {
+              const rect = e.getBoundingClientRect();
+              return rect.top >= safeMargin &&
+                rect.left >= safeMargin &&
+                rect.bottom <= window.innerHeight - safeMargin &&
+                rect.right <= window.innerWidth - safeMargin;
+            }
+            """,
+            margin);
 
     private static double Scale(double value, double fromStart, double fromEnd, double toStart, double toEnd)
         => toStart + (((value - fromStart) / (fromEnd - fromStart)) * (toEnd - toStart));
