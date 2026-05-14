@@ -11,8 +11,8 @@
     <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
     <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;playwright;bezier</PackageTags>
-    <Version>0.1.0</Version>
-    <PackageReleaseNotes>Initial OpenBullet GhostCursorSharp package release.</PackageReleaseNotes>
+    <Version>0.2.0</Version>
+    <PackageReleaseNotes>Add Playwright support, multi-browser demo targets, and multi-browser integration coverage.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
