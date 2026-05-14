@@ -1,5 +1,8 @@
 # GhostCursorSharp
 
+[![CI](https://github.com/openbullet/GhostCursorSharp/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/openbullet/GhostCursorSharp/actions/workflows/ci.yaml)
+[![NuGet](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp)
+
 `GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp` and `Microsoft.Playwright`.
 
 It generates human-like mouse paths between coordinates and provides browser-facing cursor APIs for moving, clicking, scrolling, and debugging cursor movement across Puppeteer and Playwright pages.
