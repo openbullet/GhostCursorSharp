@@ -11,8 +11,8 @@
     <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
     <PackageTags>ghost-cursor;mouse;automation;bezier;path;core</PackageTags>
-    <Version>0.2.0</Version>
-    <PackageReleaseNotes>Split the library into Core, Puppeteer, and Playwright packages.</PackageReleaseNotes>
+    <Version>0.3.0</Version>
+    <PackageReleaseNotes>Added Selenium support, Firefox coverage, and expanded demo/browser test parity across all targets.</PackageReleaseNotes>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
