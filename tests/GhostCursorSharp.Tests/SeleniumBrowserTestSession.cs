@@ -1,5 +1,6 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Firefox;
 
 namespace GhostCursorSharp.Tests;
 
@@ -7,32 +8,15 @@ internal sealed class SeleniumBrowserTestSession : IBrowserTestSession
 {
     private static readonly string FixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "custom-page.html");
 
-    private readonly ChromeDriver _driver;
+    private readonly IWebDriver _driver;
 
-    private SeleniumBrowserTestSession(ChromeDriver driver)
+    private SeleniumBrowserTestSession(IWebDriver driver)
     {
         _driver = driver;
     }
 
-    public static Task<SeleniumBrowserTestSession> CreateAsync()
-    {
-        var options = new ChromeOptions();
-        options.AddArgument("--headless=new");
-        options.AddArgument("--disable-gpu");
-        options.AddArgument("--window-size=1280,840");
-        options.AddArgument("--disable-search-engine-choice-screen");
-
-        if (OperatingSystem.IsLinux())
-        {
-            options.AddArgument("--no-sandbox");
-            options.AddArgument("--disable-dev-shm-usage");
-        }
-
-        var service = ChromeDriverService.CreateDefaultService();
-        service.HideCommandPromptWindow = true;
-
-        return Task.FromResult(new SeleniumBrowserTestSession(new ChromeDriver(service, options)));
-    }
+    public static Task<SeleniumBrowserTestSession> CreateAsync(BrowserTestCase browserTestCase)
+        => Task.FromResult(new SeleniumBrowserTestSession(CreateDriver(browserTestCase)));
 
     public async Task LoadFixtureAsync()
     {
@@ -110,6 +94,43 @@ internal sealed class SeleniumBrowserTestSession : IBrowserTestSession
         _driver.Quit();
         _driver.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    private static IWebDriver CreateDriver(BrowserTestCase browserTestCase)
+        => browserTestCase switch
+        {
+            BrowserTestCase.SeleniumChromium => CreateChromiumDriver(),
+            BrowserTestCase.SeleniumFirefox => CreateFirefoxDriver(),
+            _ => throw new ArgumentOutOfRangeException(nameof(browserTestCase), browserTestCase, "Unsupported Selenium browser test case.")
+        };
+
+    private static IWebDriver CreateChromiumDriver()
+    {
+        var options = new ChromeOptions();
+        options.AddArgument("--headless=new");
+        options.AddArgument("--disable-gpu");
+        options.AddArgument("--window-size=1280,840");
+        options.AddArgument("--disable-search-engine-choice-screen");
+
+        if (OperatingSystem.IsLinux())
+        {
+            options.AddArgument("--no-sandbox");
+            options.AddArgument("--disable-dev-shm-usage");
+        }
+
+        var service = ChromeDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        return new ChromeDriver(service, options);
+    }
+
+    private static IWebDriver CreateFirefoxDriver()
+    {
+        var options = new FirefoxOptions();
+        options.AddArgument("--headless");
+
+        var service = FirefoxDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        return new FirefoxDriver(service, options);
     }
 
     private static string ToDataUrl(string html)

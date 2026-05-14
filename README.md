@@ -6,7 +6,7 @@
 [![Playwright](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Playwright.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Playwright)
 [![Selenium](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Selenium.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Selenium)
 
-`GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp` and `Microsoft.Playwright`.
+`GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, with browser integrations for `PuppeteerSharp`, `Microsoft.Playwright`, and Selenium WebDriver.
 
 It generates human-like mouse paths between coordinates and provides browser-facing cursor APIs for moving, clicking, scrolling, and debugging cursor movement across Puppeteer and Playwright pages.
 
@@ -432,8 +432,7 @@ Run the included demo:
 dotnet run --project .\src\GhostCursorSharp.Demo\GhostCursorSharp.Demo.csproj
 ```
 
-That demo lets you choose `Puppeteer - Chromium`, `Playwright - Chromium`, or `Playwright - Firefox`, then runs scenario-driven tours for movement, clicking, press/release, scrolling, and random motion with the visual mouse helper enabled.
-It also supports `Selenium - Chromium`.
+That demo lets you choose `Puppeteer - Chromium`, `Playwright - Chromium`, `Playwright - Firefox`, `Selenium - Chromium`, or `Selenium - Firefox`, then runs scenario-driven tours for movement, clicking, press/release, scrolling, and random motion with the visual mouse helper enabled.
 
 ## Attribution
 

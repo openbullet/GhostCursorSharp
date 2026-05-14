@@ -5,7 +5,8 @@ public enum BrowserTestCase
     PuppeteerChromium,
     PlaywrightChromium,
     PlaywrightFirefox,
-    SeleniumChromium
+    SeleniumChromium,
+    SeleniumFirefox
 }
 
 public static class BrowserTestCases
@@ -16,7 +17,8 @@ public static class BrowserTestCases
             BrowserTestCase.PuppeteerChromium,
             BrowserTestCase.PlaywrightChromium,
             BrowserTestCase.PlaywrightFirefox,
-            BrowserTestCase.SeleniumChromium
+            BrowserTestCase.SeleniumChromium,
+            BrowserTestCase.SeleniumFirefox
         };
 }
 

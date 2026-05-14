@@ -1,14 +1,15 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Firefox;
 
 namespace GhostCursorSharp.Demo;
 
 internal sealed class SeleniumDemoBrowserRuntime : IDemoBrowserRuntime
 {
-    private readonly ChromeDriver _driver;
+    private readonly IWebDriver _driver;
     private readonly SeleniumDemoCursor _cursor;
 
-    private SeleniumDemoBrowserRuntime(ChromeDriver driver)
+    private SeleniumDemoBrowserRuntime(IWebDriver driver)
     {
         _driver = driver;
         _cursor = new SeleniumDemoCursor(new SeleniumGhostCursor(driver, new Vector(140, 140)));
@@ -16,19 +17,8 @@ internal sealed class SeleniumDemoBrowserRuntime : IDemoBrowserRuntime
 
     public IDemoCursor Cursor => _cursor;
 
-    public static Task<SeleniumDemoBrowserRuntime> CreateAsync()
-    {
-        var options = new ChromeOptions();
-        options.AddArgument("--force-device-scale-factor=1");
-        options.AddArgument("--window-size=1480,980");
-        options.AddArgument("--disable-search-engine-choice-screen");
-
-        var service = ChromeDriverService.CreateDefaultService();
-        service.HideCommandPromptWindow = true;
-
-        var driver = new ChromeDriver(service, options);
-        return Task.FromResult(new SeleniumDemoBrowserRuntime(driver));
-    }
+    public static Task<SeleniumDemoBrowserRuntime> CreateAsync(DemoBrowserTarget target)
+        => Task.FromResult(new SeleniumDemoBrowserRuntime(CreateDriver(target)));
 
     public async Task LoadPageAsync(string pageAssetName, string baseDirectory)
     {
@@ -46,6 +36,35 @@ internal sealed class SeleniumDemoBrowserRuntime : IDemoBrowserRuntime
         _driver.Quit();
         _driver.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    private static IWebDriver CreateDriver(DemoBrowserTarget target)
+        => target switch
+        {
+            DemoBrowserTarget.SeleniumChromium => CreateChromiumDriver(),
+            DemoBrowserTarget.SeleniumFirefox => CreateFirefoxDriver(),
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, "Unsupported Selenium demo browser target.")
+        };
+
+    private static IWebDriver CreateChromiumDriver()
+    {
+        var options = new ChromeOptions();
+        options.AddArgument("--force-device-scale-factor=1");
+        options.AddArgument("--window-size=1480,980");
+        options.AddArgument("--disable-search-engine-choice-screen");
+
+        var service = ChromeDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        return new ChromeDriver(service, options);
+    }
+
+    private static IWebDriver CreateFirefoxDriver()
+    {
+        var options = new FirefoxOptions();
+        var service = FirefoxDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+
+        return new FirefoxDriver(service, options);
     }
 
     private static string ToDataUrl(string html)

@@ -141,15 +141,17 @@ internal sealed class GhostCursorScroller
         }
 
         var endViewport = await GetViewportMetricsAsync();
-        var verticalMoved = Math.Abs(endViewport.ScrollPositionTop - startScrollY) > 0.5;
-        var horizontalMoved = Math.Abs(endViewport.ScrollPositionLeft - startScrollX) > 0.5;
+        var movedX = endViewport.ScrollPositionLeft - startScrollX;
+        var movedY = endViewport.ScrollPositionTop - startScrollY;
+        var remainingX = delta.X - movedX;
+        var remainingY = delta.Y - movedY;
 
-        if ((!verticalMoved && absoluteY > 0) || (!horizontalMoved && absoluteX > 0))
+        if (Math.Abs(remainingX) > 0.5 || Math.Abs(remainingY) > 0.5)
         {
             await _state.Page.EvaluateFunctionAsync(
                 "(x, y, smooth) => window.scrollBy({ left: x, top: y, behavior: smooth ? 'smooth' : 'auto' })",
-                delta.X,
-                delta.Y,
+                remainingX,
+                remainingY,
                 options.ScrollSpeed < 90);
         }
 

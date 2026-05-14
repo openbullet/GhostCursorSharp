@@ -9,6 +9,7 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
     private readonly IWebDriver _driver;
     private readonly IActionExecutor _actionExecutor;
     private readonly IJavaScriptExecutor _javascriptExecutor;
+    private readonly bool _useCurrentContextCoordinates;
     private readonly PointerInputDevice _pointer = new(PointerKind.Mouse, "ghost-cursor");
     private readonly WheelInputDevice _wheel = new("ghost-cursor-wheel");
 
@@ -19,6 +20,8 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
             ?? throw new InvalidOperationException("The Selenium driver must implement IActionExecutor.");
         _javascriptExecutor = driver as IJavaScriptExecutor
             ?? throw new InvalidOperationException("The Selenium driver must implement IJavaScriptExecutor.");
+        _useCurrentContextCoordinates = GetBrowserName(driver)
+            .Contains("firefox", StringComparison.OrdinalIgnoreCase);
     }
 
     public string CreateXPathSelector(string selector)
@@ -62,12 +65,24 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
 
     public Task MoveMouseAsync(double x, double y, int steps = 1)
     {
-        var frameOffset = GetCurrentFrameViewportOffset();
+        var frameOffset = _useCurrentContextCoordinates
+            ? new FrameOffset(0, 0)
+            : GetCurrentFrameViewportOffset();
+        var viewport = GetCurrentViewportSize(useRootContext: !_useCurrentContextCoordinates);
+        var targetX = x + frameOffset.X;
+        var targetY = y + frameOffset.Y;
+
+        if (viewport is not null)
+        {
+            targetX = Math.Clamp(targetX, 0, Math.Max(0, viewport.Width - 1));
+            targetY = Math.Clamp(targetY, 0, Math.Max(0, viewport.Height - 1));
+        }
+
         var sequence = new ActionSequence(_pointer);
         sequence.AddAction(_pointer.CreatePointerMove(
             CoordinateOrigin.Viewport,
-            (int)Math.Round(x + frameOffset.X),
-            (int)Math.Round(y + frameOffset.Y),
+            (int)Math.Round(targetX),
+            (int)Math.Round(targetY),
             TimeSpan.Zero));
         _actionExecutor.PerformActions([sequence]);
         return Task.CompletedTask;
@@ -83,11 +98,14 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
             return Task.CompletedTask;
         }
 
+        var viewport = GetCurrentViewportSize(useRootContext: true);
+        var originX = viewport is null ? 0 : (int)Math.Max(0, Math.Round(viewport.Width / 2d));
+        var originY = viewport is null ? 0 : (int)Math.Max(0, Math.Round(viewport.Height / 2d));
         var sequence = new ActionSequence(_wheel);
         sequence.AddAction(_wheel.CreateWheelScroll(
-            CoordinateOrigin.Pointer,
-            0,
-            0,
+            CoordinateOrigin.Viewport,
+            originX,
+            originY,
             wheelDeltaX,
             wheelDeltaY,
             TimeSpan.FromMilliseconds(24)));
@@ -152,6 +170,45 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
         }
     }
 
+    private ViewportSize? GetCurrentViewportSize(bool useRootContext)
+    {
+        try
+        {
+            return SeleniumScriptExecutor.ConvertResult<ViewportSize>(_javascriptExecutor.ExecuteScript(
+                useRootContext
+                    ? """
+                      let currentWindow = window;
+
+                      while (currentWindow.parent && currentWindow.parent !== currentWindow) {
+                        try {
+                          currentWindow = currentWindow.parent;
+                        } catch {
+                          break;
+                        }
+                      }
+
+                      return {
+                        width: currentWindow.innerWidth,
+                        height: currentWindow.innerHeight
+                      };
+                      """
+                    : """
+                      return {
+                        width: window.innerWidth,
+                        height: window.innerHeight
+                      };
+                      """));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string GetBrowserName(IWebDriver driver)
+        => (driver as IHasCapabilities)?.Capabilities.GetCapability("browserName")?.ToString()
+            ?? string.Empty;
+
     private static OpenQA.Selenium.Interactions.MouseButton MapButton(MouseButton button)
         => button switch
         {
@@ -162,4 +219,6 @@ internal sealed class SeleniumCursorPageAdapter : ICursorPageAdapter
         };
 
     private sealed record FrameOffset(double X, double Y);
+
+    private sealed record ViewportSize(double Width, double Height);
 }

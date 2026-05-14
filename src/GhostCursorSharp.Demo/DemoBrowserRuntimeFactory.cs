@@ -8,7 +8,8 @@ internal static class DemoBrowserRuntimeFactory
             DemoBrowserTarget.PuppeteerChromium => await PuppeteerDemoBrowserRuntime.CreateAsync(),
             DemoBrowserTarget.PlaywrightChromium => await PlaywrightDemoBrowserRuntime.CreateAsync(DemoBrowserTarget.PlaywrightChromium),
             DemoBrowserTarget.PlaywrightFirefox => await PlaywrightDemoBrowserRuntime.CreateAsync(DemoBrowserTarget.PlaywrightFirefox),
-            DemoBrowserTarget.SeleniumChromium => await SeleniumDemoBrowserRuntime.CreateAsync(),
+            DemoBrowserTarget.SeleniumChromium => await SeleniumDemoBrowserRuntime.CreateAsync(DemoBrowserTarget.SeleniumChromium),
+            DemoBrowserTarget.SeleniumFirefox => await SeleniumDemoBrowserRuntime.CreateAsync(DemoBrowserTarget.SeleniumFirefox),
             _ => throw new ArgumentOutOfRangeException(nameof(target), target, "Unsupported demo browser target.")
         };
 }
