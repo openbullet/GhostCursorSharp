@@ -528,6 +528,22 @@ public class GhostCursorIntegrationTests
 
     [Theory]
     [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
+    public async Task InstallMouseHelperAsync_InjectsVisualHelper(BrowserTestCase browserTestCase)
+    {
+        await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);
+        await session.LoadFixtureAsync();
+
+        var cursor = session.CreateCursor();
+        await cursor.InstallMouseHelperAsync();
+
+        var helperInstalled = await session.EvaluateExpressionAsync<bool>(
+            "Boolean(window.__ghostCursorRemoveMouseHelper && document.querySelector('p-mouse-pointer'))");
+
+        Assert.True(helperInstalled);
+    }
+
+    [Theory]
+    [MemberData(nameof(BrowserTestCases.All), MemberType = typeof(BrowserTestCases))]
     public async Task PerformRandomMoves_StartsAndCanBeStopped(BrowserTestCase browserTestCase)
     {
         await using var session = await BrowserTestSessionFactory.CreateAsync(browserTestCase);

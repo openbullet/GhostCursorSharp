@@ -4,6 +4,7 @@
 [![Core](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Core.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Core)
 [![Puppeteer](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Puppeteer.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Puppeteer)
 [![Playwright](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Playwright.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Playwright)
+[![Selenium](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Selenium.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Selenium)
 
 `GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp` and `Microsoft.Playwright`.
 
@@ -19,12 +20,15 @@ Choose the package that matches your target:
   `GhostCursor` for `PuppeteerSharp`. Depends on `Core`.
 - `Ruri.GhostCursorSharp.Playwright`
   `PlaywrightGhostCursor` for `Microsoft.Playwright`. Depends on `Core`.
+- `Ruri.GhostCursorSharp.Selenium`
+  `SeleniumGhostCursor` for Selenium WebDriver. Depends on `Core`.
 
 Install the package you need:
 
 ```powershell
 dotnet add package Ruri.GhostCursorSharp.Puppeteer
 dotnet add package Ruri.GhostCursorSharp.Playwright
+dotnet add package Ruri.GhostCursorSharp.Selenium
 dotnet add package Ruri.GhostCursorSharp.Core
 ```
 
@@ -40,6 +44,7 @@ Implemented today:
 - Path generation with `CursorPath.Generate(...)` and `CursorPath.GenerateTimed(...)`
 - Shared `ElementBox`, `MouseButton`, and option models in `Core`
 - `GhostCursor` and `PlaywrightGhostCursor` movement and click APIs
+- `SeleniumGhostCursor` movement, click, scroll, and mouse-helper APIs
 - Selector lookup with CSS and XPath
 - `scroll`, `scrollTo`, and `scrollIntoView`
 - Random movement with `PerformRandomMoves` and `ToggleRandomMove(...)`
@@ -114,6 +119,20 @@ var page = await browser.NewPageAsync();
 await page.GotoAsync("https://example.com");
 
 var cursor = new PlaywrightGhostCursor(page);
+
+await cursor.ClickAsync("a");
+```
+
+Use it with Selenium WebDriver:
+
+```csharp
+using GhostCursorSharp;
+using OpenQA.Selenium.Chrome;
+
+using var driver = new ChromeDriver();
+driver.Navigate().GoToUrl("https://example.com");
+
+var cursor = new SeleniumGhostCursor(driver);
 
 await cursor.ClickAsync("a");
 ```
@@ -205,6 +224,28 @@ var cursor = new PlaywrightGhostCursor(page, new GhostCursorOptions
 
 Supports the same option model as the Puppeteer facade.
 
+### `new SeleniumGhostCursor(driver, start?)`
+
+```csharp
+var cursor = new SeleniumGhostCursor(driver);
+var cursorWithStart = new SeleniumGhostCursor(driver, new Vector(100, 100));
+```
+
+Creates a cursor bound to an `OpenQA.Selenium.IWebDriver`.
+
+### `new SeleniumGhostCursor(driver, options)`
+
+```csharp
+var cursor = new SeleniumGhostCursor(driver, new GhostCursorOptions
+{
+    Start = new Vector(100, 100),
+    Visible = true,
+    DefaultOptions = new DefaultOptions()
+});
+```
+
+Supports the same option model as the Puppeteer and Playwright facades.
+
 ### `GhostCursor.CreateCursor(page, start?, defaultOptions?, visible?)`
 
 Compatibility-oriented factory:
@@ -219,6 +260,14 @@ Compatibility-oriented factory for Playwright:
 
 ```csharp
 var cursor = PlaywrightGhostCursor.CreateCursor(page, visible: true);
+```
+
+### `SeleniumGhostCursor.CreateCursor(driver, start?, defaultOptions?, visible?)`
+
+Compatibility-oriented factory for Selenium:
+
+```csharp
+var cursor = SeleniumGhostCursor.CreateCursor(driver, visible: true);
 ```
 
 ### `GetLocation(): Vector`
@@ -256,6 +305,8 @@ Resolves an element box using the same geometry fallbacks as cursor movement.
 - Handles inline elements more reliably than a plain bounding box.
 
 For `PlaywrightGhostCursor`, the equivalent return type is `ElementHandleBoundingBoxResult`.
+
+For `SeleniumGhostCursor`, the equivalent return type is `ElementBox`.
 
 ### `MoveAsync(selector | element | boundingBox, options?): Task`
 
@@ -382,6 +433,7 @@ dotnet run --project .\src\GhostCursorSharp.Demo\GhostCursorSharp.Demo.csproj
 ```
 
 That demo lets you choose `Puppeteer - Chromium`, `Playwright - Chromium`, or `Playwright - Firefox`, then runs scenario-driven tours for movement, clicking, press/release, scrolling, and random motion with the visual mouse helper enabled.
+It also supports `Selenium - Chromium`.
 
 ## Attribution
 

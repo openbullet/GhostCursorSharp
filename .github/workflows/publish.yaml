@@ -55,6 +55,7 @@ jobs:
         dotnet pack src/GhostCursorSharp.Core/GhostCursorSharp.csproj --output nupkgs --configuration Release --no-build
         dotnet pack src/GhostCursorSharp.Puppeteer/GhostCursorSharp.Puppeteer.csproj --output nupkgs --configuration Release --no-build
         dotnet pack src/GhostCursorSharp.Playwright/GhostCursorSharp.Playwright.csproj --output nupkgs --configuration Release --no-build
+        dotnet pack src/GhostCursorSharp.Selenium/GhostCursorSharp.Selenium.csproj --output nupkgs --configuration Release --no-build
 
     - name: Upload NuGet Package
       run: dotnet nuget push "nupkgs/*.nupkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate

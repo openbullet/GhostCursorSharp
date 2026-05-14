@@ -23,7 +23,8 @@ var browserChoices = new Dictionary<string, DemoBrowserTarget>(StringComparer.Or
 {
     ["Puppeteer - Chromium"] = DemoBrowserTarget.PuppeteerChromium,
     ["Playwright - Chromium"] = DemoBrowserTarget.PlaywrightChromium,
-    ["Playwright - Firefox"] = DemoBrowserTarget.PlaywrightFirefox
+    ["Playwright - Firefox"] = DemoBrowserTarget.PlaywrightFirefox,
+    ["Selenium - Chromium"] = DemoBrowserTarget.SeleniumChromium
 };
 
 while (true)

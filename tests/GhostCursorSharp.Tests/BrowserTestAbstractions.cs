@@ -4,7 +4,8 @@ public enum BrowserTestCase
 {
     PuppeteerChromium,
     PlaywrightChromium,
-    PlaywrightFirefox
+    PlaywrightFirefox,
+    SeleniumChromium
 }
 
 public static class BrowserTestCases
@@ -14,7 +15,8 @@ public static class BrowserTestCases
         {
             BrowserTestCase.PuppeteerChromium,
             BrowserTestCase.PlaywrightChromium,
-            BrowserTestCase.PlaywrightFirefox
+            BrowserTestCase.PlaywrightFirefox,
+            BrowserTestCase.SeleniumChromium
         };
 }
 
@@ -41,6 +43,8 @@ internal interface ITestCursor
     Task ClickAsync(string selector, ClickOptions? options = null);
 
     Task ClickAsync(object element, ClickOptions? options = null);
+
+    Task InstallMouseHelperAsync();
 
     Task ScrollAsync(Vector delta, ScrollOptions? options = null);
 

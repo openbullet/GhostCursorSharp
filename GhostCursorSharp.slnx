@@ -4,6 +4,7 @@
     <Project Path="src/GhostCursorSharp.Core/GhostCursorSharp.csproj" />
     <Project Path="src/GhostCursorSharp.Playwright/GhostCursorSharp.Playwright.csproj" />
     <Project Path="src/GhostCursorSharp.Puppeteer/GhostCursorSharp.Puppeteer.csproj" />
+    <Project Path="src/GhostCursorSharp.Selenium/GhostCursorSharp.Selenium.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GhostCursorSharp.Tests/GhostCursorSharp.Tests.csproj" />

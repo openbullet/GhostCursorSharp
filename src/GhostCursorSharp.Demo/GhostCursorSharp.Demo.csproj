@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
+    <PackageReference Include="Selenium.Support" Version="4.40.0" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.40.0" />
     <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
     <PackageReference Include="Spectre.Console" Version="0.50.0" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117">
@@ -20,6 +22,7 @@
     <ProjectReference Include="..\GhostCursorSharp.Core\GhostCursorSharp.csproj" />
     <ProjectReference Include="..\GhostCursorSharp.Playwright\GhostCursorSharp.Playwright.csproj" />
     <ProjectReference Include="..\GhostCursorSharp.Puppeteer\GhostCursorSharp.Puppeteer.csproj" />
+    <ProjectReference Include="..\GhostCursorSharp.Selenium\GhostCursorSharp.Selenium.csproj" />
   </ItemGroup>
 
   <ItemGroup>

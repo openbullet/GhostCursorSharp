@@ -4,5 +4,6 @@ internal enum DemoBrowserTarget
 {
     PuppeteerChromium,
     PlaywrightChromium,
-    PlaywrightFirefox
+    PlaywrightFirefox,
+    SeleniumChromium
 }

@@ -139,6 +139,9 @@ internal sealed class PuppeteerBrowserTestSession : IBrowserTestSession
         public Task ClickAsync(object element, ClickOptions? options = null)
             => _cursor.ClickAsync((IElementHandle)element, options);
 
+        public Task InstallMouseHelperAsync()
+            => _cursor.InstallMouseHelperAsync();
+
         public Task ScrollAsync(Vector delta, ScrollOptions? options = null)
             => _cursor.ScrollAsync(delta, options);
 
