@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GhostCursorSharp Scroll Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", sans-serif;
+      --ink: #152033;
+      --panel: rgba(255, 255, 255, 0.8);
+      --shadow: 0 18px 46px rgba(21, 32, 51, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 2300px;
+      min-height: 2100px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 224, 138, 0.7), transparent 24%),
+        radial-gradient(circle at 90% 12%, rgba(123, 201, 255, 0.5), transparent 20%),
+        radial-gradient(circle at 30% 85%, rgba(155, 241, 196, 0.42), transparent 20%),
+        linear-gradient(140deg, #f6f1e8 0%, #edf3fb 55%, #f7fbff 100%);
+      color: var(--ink);
+    }
+
+    .hero {
+      position: relative;
+      width: 1500px;
+      height: 980px;
+      margin: 0 auto;
+    }
+
+    .headline {
+      padding: 34px 42px 0;
+      max-width: 760px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 48px;
+      letter-spacing: -0.05em;
+    }
+
+    .headline p {
+      margin: 14px 0 0;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .target {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      border-radius: 24px;
+      border: 2px solid rgba(21, 32, 51, 0.1);
+      box-shadow: var(--shadow);
+      font-weight: 700;
+      user-select: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    }
+
+    .target:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 22px 52px rgba(21, 32, 51, 0.18);
+    }
+
+    .is-pressed {
+      transform: scale(0.98);
+      filter: saturate(1.15) brightness(0.96);
+    }
+
+    .is-clicked {
+      animation: target-click-flash 420ms ease;
+    }
+
+    @keyframes target-click-flash {
+      0% {
+        transform: scale(1);
+        box-shadow: var(--shadow);
+      }
+      38% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 14px rgba(255, 255, 255, 0.7), 0 24px 56px rgba(21, 32, 51, 0.22);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: var(--shadow);
+      }
+    }
+
+    .offscreen-zone {
+      position: absolute;
+      border-radius: 32px;
+      border: 2px dashed rgba(21, 32, 51, 0.16);
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    #zone-e {
+      left: 110px;
+      top: 1320px;
+      width: 580px;
+      height: 300px;
+    }
+
+    #zone-f {
+      left: 1540px;
+      top: 1420px;
+      width: 560px;
+      height: 360px;
+    }
+
+    #target-e {
+      left: 238px;
+      top: 1418px;
+      width: 220px;
+      height: 110px;
+      background: #f7d8ff;
+    }
+
+    #target-f {
+      left: 1710px;
+      top: 1518px;
+      width: 280px;
+      height: 176px;
+      background: #b8ffe5;
+    }
+
+    .zone-label {
+      position: absolute;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(21, 32, 51, 0.55);
+    }
+
+    #zone-label-e {
+      left: 146px;
+      top: 1354px;
+    }
+
+    #zone-label-f {
+      left: 1578px;
+      top: 1454px;
+    }
+
+    #hud {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: 360px;
+      padding: 18px 18px 14px;
+      border-radius: 26px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 24px 60px rgba(21, 32, 51, 0.16);
+      z-index: 30;
+    }
+
+    #hud h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    #hud p {
+      margin: 10px 0 14px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(21, 32, 51, 0.8);
+    }
+
+    #event-log {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    #event-log li {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.76);
+      font-size: 13px;
+      line-height: 1.4;
+      border: 1px solid rgba(21, 32, 51, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <aside id="hud">
+    <h2>Scroll Demo HUD</h2>
+    <p>
+      This page is intentionally larger than the viewport so scroll and far-corner scenarios
+      can exercise offscreen navigation and clicking behavior.
+    </p>
+    <ol id="event-log"></ol>
+  </aside>
+
+  <main class="hero">
+    <section class="headline">
+      <h1>GhostCursorSharp Scroll Playground</h1>
+      <p>
+        The console app scrolls down to offscreen targets and then farther into the lower-right
+        corner so you can judge cursor behavior across long document distances.
+      </p>
+    </section>
+  </main>
+
+  <div id="zone-e" class="offscreen-zone" aria-hidden="true"></div>
+  <div id="zone-f" class="offscreen-zone" aria-hidden="true"></div>
+  <div id="zone-label-e" class="zone-label">Offscreen South</div>
+  <div id="zone-label-f" class="zone-label">Far Corner</div>
+  <button id="target-e" class="target" type="button" data-demo-clickable>
+    Scroll Target E
+  </button>
+  <button id="target-f" class="target" type="button" data-demo-clickable>
+    Corner Target F
+  </button>
+
+  <script>
+    (() => {
+      const eventLog = document.querySelector('#event-log');
+      const clickableElements = [...document.querySelectorAll('[data-demo-clickable]')];
+      let counter = 0;
+
+      const log = (message) => {
+        const item = document.createElement('li');
+        item.textContent = `${++counter}. ${message}`;
+        eventLog.prepend(item);
+      };
+
+      const flash = (element, className) => {
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+      };
+
+      clickableElements.forEach((element) => {
+        const label = element.textContent.trim().replace(/\s+/g, ' ');
+
+        element.addEventListener('mousedown', (event) => {
+          if (event.button !== 0) {
+            return;
+          }
+
+          element.classList.add('is-pressed');
+          log(`${label} mouse down`);
+        });
+
+        element.addEventListener('mouseup', (event) => {
+          if (event.button !== 0) {
+            return;
+          }
+
+          element.classList.remove('is-pressed');
+          log(`${label} mouse up`);
+        });
+
+        element.addEventListener('click', () => {
+          element.classList.remove('is-pressed');
+          flash(element, 'is-clicked');
+          log(`${label} clicked`);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

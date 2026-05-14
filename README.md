@@ -312,7 +312,7 @@ Run the included demo:
 dotnet run --project .\src\GhostCursorSharp.Demo\GhostCursorSharp.Demo.csproj
 ```
 
-That demo opens Chromium headful, installs the visual mouse helper, and animates movement across a fixture page so you can inspect the cursor behavior directly.
+That demo opens Chromium headful, installs the visual mouse helper, and lets you choose scenario-driven tours for movement, clicking, press/release, scrolling, and random motion.
 
 ## Attribution
 

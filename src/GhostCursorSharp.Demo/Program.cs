@@ -1,12 +1,15 @@
 using GhostCursorSharp;
+using GhostCursorSharp.Demo;
+using GhostCursorSharp.Demo.Scenarios;
 using PuppeteerSharp;
+using Spectre.Console;
 
 var browserFetcher = new BrowserFetcher(new BrowserFetcherOptions
 {
     Path = Path.Combine(AppContext.BaseDirectory, ".browser")
 });
 
-Console.WriteLine("Preparing Chromium...");
+AnsiConsole.MarkupLine("[grey]Preparing Chromium...[/]");
 
 var installedBrowser = browserFetcher.GetInstalledBrowsers().FirstOrDefault()
     ?? await browserFetcher.DownloadAsync();
@@ -19,65 +22,56 @@ await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
     Args =
     [
         "--force-device-scale-factor=1",
-        "--window-size=1440,960"
+        "--window-size=1480,980"
     ]
 });
 
-await using var page = await browser.NewPageAsync();
-var cursor = new GhostCursor(page, new Vector(140, 140));
-var demoPagePath = Path.Combine(AppContext.BaseDirectory, "demo-page.html");
-var demoPageHtml = await File.ReadAllTextAsync(demoPagePath);
+var page = (await browser.PagesAsync()).FirstOrDefault() ?? await browser.NewPageAsync();
+var context = new DemoScenarioContext(page, AppContext.BaseDirectory);
 
-await page.SetContentAsync(demoPageHtml);
-
-await cursor.InstallMouseHelperAsync();
-await page.BringToFrontAsync();
-await cursor.MoveAsync("#target-a", new MoveOptions
+var scenarios = new IDemoScenario[]
 {
-    MoveSpeed = 24,
-    DelayPerStep = 3,
-    PaddingPercentage = 0
-});
-await Task.Delay(180);
+    new BezierMoveScenario(),
+    new ClickShowcaseScenario(),
+    new MousePressScenario(),
+    new ScrollScenario(),
+    new RandomMoveScenario(),
+    new FullFeatureTourScenario(
+        new BezierMoveScenario(),
+        new ClickShowcaseScenario(),
+        new MousePressScenario(),
+        new ScrollScenario(),
+        new RandomMoveScenario())
+};
 
-await cursor.MoveAsync("#target-b", new MoveOptions
+var scenarioMap = scenarios.ToDictionary(s => s.Name, StringComparer.Ordinal);
+
+while (true)
 {
-    MoveSpeed = 28,
-    DelayPerStep = 2,
-    Destination = new Vector(18, 22)
-});
-await Task.Delay(180);
+    var scenarioName = await AnsiConsole.PromptAsync(
+        new SelectionPrompt<string>()
+            .Title("[yellow]Choose a GhostCursorSharp demo scenario[/]")
+            .PageSize(10)
+            .AddChoices(scenarioMap.Keys.Append("Exit")));
 
-await cursor.MoveAsync("#target-d", new MoveOptions
-{
-    MoveSpeed = 28,
-    DelayPerStep = 2,
-    Destination = new Vector(176, 28)
-});
-await Task.Delay(180);
+    if (scenarioName == "Exit")
+    {
+        break;
+    }
 
-await cursor.MoveAsync("#target-c", new MoveOptions
-{
-    MoveSpeed = 26,
-    DelayPerStep = 2,
-    Destination = new Vector(26, 112)
-});
-await Task.Delay(180);
+    AnsiConsole.MarkupLine($"[grey]Running:[/] [cyan]{scenarioName}[/]");
+    try
+    {
+        await scenarioMap[scenarioName].RunAsync(context);
+        AnsiConsole.MarkupLine("[green]Scenario complete.[/] Press any key to choose another one.");
+    }
+    catch (Exception ex)
+    {
+        AnsiConsole.MarkupLine($"[red]Scenario failed:[/] {Markup.Escape(ex.Message)}");
+        AnsiConsole.MarkupLine("[grey]Press any key to return to the menu.[/]");
+    }
 
-await cursor.MoveAsync("#target-b", new MoveOptions
-{
-    MoveSpeed = 30,
-    DelayPerStep = 1,
-    Destination = new Vector(212, 132)
-});
-await Task.Delay(140);
+    Console.ReadKey(true);
+}
 
-await cursor.MoveAsync("#target-a", new MoveOptions
-{
-    MoveSpeed = 32,
-    DelayPerStep = 1,
-    PaddingPercentage = 35
-});
-
-Console.WriteLine("Demo completed. Press Enter to close the browser.");
-Console.ReadLine();
+await browser.CloseAsync();
