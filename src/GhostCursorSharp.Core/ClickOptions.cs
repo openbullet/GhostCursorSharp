@@ -1,5 +1,3 @@
-using PuppeteerSharp.Input;
-
 namespace GhostCursorSharp;
 
 /// <summary>

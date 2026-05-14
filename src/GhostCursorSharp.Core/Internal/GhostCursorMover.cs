@@ -1,5 +1,3 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp.Internal;
 
 internal sealed class GhostCursorMover
@@ -68,7 +66,7 @@ internal sealed class GhostCursorMover
             delayPerStep,
             shouldAbort);
 
-    public async Task MoveAsync(BoundingBox boundingBox, ResolvedMoveOptions options)
+    public async Task MoveAsync(ElementBox boundingBox, ResolvedMoveOptions options)
     {
         var destination = GetTargetPoint(boundingBox, options);
         await MoveWithOvershootAsync(destination, options);
@@ -188,18 +186,18 @@ internal sealed class GhostCursorMover
         await MoveToAsync(destination, basePathOptions, options.DelayPerStep);
     }
 
-    private static Vector GetTargetPoint(BoundingBox boundingBox, ResolvedMoveOptions options)
+    private static Vector GetTargetPoint(ElementBox boundingBox, ResolvedMoveOptions options)
         => CursorTargeting.GetPointInBox(boundingBox, new BoxOptions
         {
             PaddingPercentage = options.PaddingPercentage,
             Destination = options.Destination
         });
 
-    private static bool IntersectsElement(Vector point, BoundingBox box)
-        => point.X > Convert.ToDouble(box.X) &&
-           point.X <= Convert.ToDouble(box.X + box.Width) &&
-           point.Y > Convert.ToDouble(box.Y) &&
-           point.Y <= Convert.ToDouble(box.Y + box.Height);
+    private static bool IntersectsElement(Vector point, ElementBox box)
+        => point.X > box.X &&
+           point.X <= box.X + box.Width &&
+           point.Y > box.Y &&
+           point.Y <= box.Y + box.Height;
 
     private static bool ShouldOvershoot(Vector from, Vector to, double threshold)
         => Distance(from, to) > threshold;

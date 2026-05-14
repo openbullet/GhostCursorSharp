@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
     <PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
@@ -29,7 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\GhostCursorSharp\GhostCursorSharp.csproj" />
+    <ProjectReference Include="..\..\src\GhostCursorSharp.Core\GhostCursorSharp.csproj" />
+    <ProjectReference Include="..\..\src\GhostCursorSharp.Playwright\GhostCursorSharp.Playwright.csproj" />
+    <ProjectReference Include="..\..\src\GhostCursorSharp.Puppeteer\GhostCursorSharp.Puppeteer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

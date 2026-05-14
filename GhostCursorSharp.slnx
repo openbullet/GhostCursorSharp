@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/GhostCursorSharp.Demo/GhostCursorSharp.Demo.csproj" />
-    <Project Path="src/GhostCursorSharp/GhostCursorSharp.csproj" />
+    <Project Path="src/GhostCursorSharp.Core/GhostCursorSharp.csproj" />
+    <Project Path="src/GhostCursorSharp.Playwright/GhostCursorSharp.Playwright.csproj" />
+    <Project Path="src/GhostCursorSharp.Puppeteer/GhostCursorSharp.Puppeteer.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GhostCursorSharp.Tests/GhostCursorSharp.Tests.csproj" />

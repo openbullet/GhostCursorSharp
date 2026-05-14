@@ -14,7 +14,7 @@ internal sealed class MousePressScenario : IDemoScenario
 
         await cursor.MouseDownAsync(new ClickOptions
         {
-            Button = PuppeteerSharp.Input.MouseButton.Left,
+            Button = MouseButton.Left,
             ClickCount = 1
         });
 
@@ -22,7 +22,7 @@ internal sealed class MousePressScenario : IDemoScenario
 
         await cursor.MouseUpAsync(new ClickOptions
         {
-            Button = PuppeteerSharp.Input.MouseButton.Left,
+            Button = MouseButton.Left,
             ClickCount = 1
         });
 

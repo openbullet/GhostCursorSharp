@@ -17,7 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GhostCursorSharp\GhostCursorSharp.csproj" />
+    <ProjectReference Include="..\GhostCursorSharp.Core\GhostCursorSharp.csproj" />
+    <ProjectReference Include="..\GhostCursorSharp.Playwright\GhostCursorSharp.Playwright.csproj" />
+    <ProjectReference Include="..\GhostCursorSharp.Puppeteer\GhostCursorSharp.Puppeteer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

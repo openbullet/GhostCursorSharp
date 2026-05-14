@@ -1,7 +1,7 @@
 namespace GhostCursorSharp;
 
 /// <summary>
-/// Configures a <see cref="GhostCursor"/> instance.
+/// Configures a browser-specific ghost cursor instance.
 /// </summary>
 public sealed class GhostCursorOptions
 {

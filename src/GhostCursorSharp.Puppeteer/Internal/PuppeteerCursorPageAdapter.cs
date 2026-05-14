@@ -39,17 +39,17 @@ internal sealed class PuppeteerCursorPageAdapter : ICursorPageAdapter
     public Task MouseWheelAsync(double deltaX, double deltaY)
         => _page.Mouse.WheelAsync(Convert.ToDecimal(deltaX), Convert.ToDecimal(deltaY));
 
-    public Task MouseDownAsync(PuppeteerSharp.Input.MouseButton button, int clickCount)
+    public Task MouseDownAsync(MouseButton button, int clickCount)
         => _page.Mouse.DownAsync(new PuppeteerSharp.Input.ClickOptions
         {
-            Button = button,
+            Button = MapButton(button),
             Count = clickCount
         });
 
-    public Task MouseUpAsync(PuppeteerSharp.Input.MouseButton button, int clickCount)
+    public Task MouseUpAsync(MouseButton button, int clickCount)
         => _page.Mouse.UpAsync(new PuppeteerSharp.Input.ClickOptions
         {
-            Button = button,
+            Button = MapButton(button),
             Count = clickCount
         });
 
@@ -58,4 +58,13 @@ internal sealed class PuppeteerCursorPageAdapter : ICursorPageAdapter
 
     public Task EvaluateFunctionAsync(string script, params object?[] args)
         => _page.EvaluateFunctionAsync(script, args);
+
+    private static PuppeteerSharp.Input.MouseButton MapButton(MouseButton button)
+        => button switch
+        {
+            MouseButton.Left => PuppeteerSharp.Input.MouseButton.Left,
+            MouseButton.Middle => PuppeteerSharp.Input.MouseButton.Middle,
+            MouseButton.Right => PuppeteerSharp.Input.MouseButton.Right,
+            _ => throw new NotSupportedException($"Mouse button '{button}' is not supported by PuppeteerSharp.")
+        };
 }

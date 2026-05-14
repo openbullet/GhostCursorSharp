@@ -1,5 +1,3 @@
-using PuppeteerSharp.Input;
-
 namespace GhostCursorSharp.Internal;
 
 internal sealed record ResolvedGetElementOptions(int? WaitForSelector);

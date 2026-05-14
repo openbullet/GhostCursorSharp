@@ -1,7 +1,9 @@
 # GhostCursorSharp
 
 [![CI](https://github.com/openbullet/GhostCursorSharp/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/openbullet/GhostCursorSharp/actions/workflows/ci.yaml)
-[![NuGet](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp)
+[![Core](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Core.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Core)
+[![Puppeteer](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Puppeteer.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Puppeteer)
+[![Playwright](https://img.shields.io/nuget/v/Ruri.GhostCursorSharp.Playwright.svg)](https://www.nuget.org/packages/Ruri.GhostCursorSharp.Playwright)
 
 `GhostCursorSharp` is a .NET 10 port of the upstream [`ghost-cursor`](https://github.com/Xetera/ghost-cursor) package, built around `PuppeteerSharp` and `Microsoft.Playwright`.
 
@@ -9,10 +11,21 @@ It generates human-like mouse paths between coordinates and provides browser-fac
 
 ## Installation
 
-Install the package:
+Choose the package that matches your target:
+
+- `Ruri.GhostCursorSharp.Core`
+  Path generation, shared options, `ElementBox`, and target-agnostic cursor infrastructure.
+- `Ruri.GhostCursorSharp.Puppeteer`
+  `GhostCursor` for `PuppeteerSharp`. Depends on `Core`.
+- `Ruri.GhostCursorSharp.Playwright`
+  `PlaywrightGhostCursor` for `Microsoft.Playwright`. Depends on `Core`.
+
+Install the package you need:
 
 ```powershell
-dotnet add package Ruri.GhostCursorSharp
+dotnet add package Ruri.GhostCursorSharp.Puppeteer
+dotnet add package Ruri.GhostCursorSharp.Playwright
+dotnet add package Ruri.GhostCursorSharp.Core
 ```
 
 If you are developing this repo itself:
@@ -25,6 +38,7 @@ dotnet restore GhostCursorSharp.slnx
 
 Implemented today:
 - Path generation with `CursorPath.Generate(...)` and `CursorPath.GenerateTimed(...)`
+- Shared `ElementBox`, `MouseButton`, and option models in `Core`
 - `GhostCursor` and `PlaywrightGhostCursor` movement and click APIs
 - Selector lookup with CSS and XPath
 - `scroll`, `scrollTo`, and `scrollIntoView`
@@ -241,6 +255,8 @@ Resolves an element box using the same geometry fallbacks as cursor movement.
 - Falls back to `boundingBox()` and then `getBoundingClientRect()`.
 - Handles inline elements more reliably than a plain bounding box.
 
+For `PlaywrightGhostCursor`, the equivalent return type is `ElementHandleBoundingBoxResult`.
+
 ### `MoveAsync(selector | element | boundingBox, options?): Task`
 
 Moves the cursor to a target element or bounding box.
@@ -290,7 +306,7 @@ Clicks at the current cursor location.
 
 - `Hesitate`: delay before pressing the mouse button.
 - `WaitForClick`: delay between mouse down and mouse up.
-- `Button`: mouse button. Defaults to left.
+- `Button`: `MouseButton.Left`, `MouseButton.Middle`, or `MouseButton.Right`. Defaults to left.
 - `ClickCount`: number of clicks. Defaults to `1`.
 - Inherits the move-related options from `MoveOptions`.
 
@@ -346,7 +362,7 @@ Supported overloads:
 
 ### `CursorPath.Generate(start, end, options?): IReadOnlyList<Vector>`
 
-Generates a human-like route between two coordinates or from a coordinate to a `BoundingBox`.
+Generates a human-like route between two coordinates or from a coordinate to an `ElementBox`.
 
 ### `CursorPath.GenerateTimed(start, end, options?): IReadOnlyList<TimedVector>`
 

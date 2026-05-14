@@ -1,13 +1,12 @@
 using PlaywrightBoundingBox = Microsoft.Playwright.ElementHandleBoundingBoxResult;
 using PlaywrightElementHandle = Microsoft.Playwright.IElementHandle;
-using PuppeteerSharp;
 using System.Text.Json;
 
 namespace GhostCursorSharp.Internal;
 
 internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
 {
-    public async Task<BoundingBox> GetElementBoxAsync(ICursorElementHandle element, bool relativeToMainFrame = true)
+    public async Task<ElementBox> GetElementBoxAsync(ICursorElementHandle element, bool relativeToMainFrame = true)
     {
         var nativeElement = UnwrapElement(element);
 
@@ -31,17 +30,15 @@ internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
             var height = rect.GetProperty("height").GetDouble();
             if (width > 0 && height > 0)
             {
-                var boundingBox = new BoundingBox
-                {
-                    X = Convert.ToDecimal(rect.GetProperty("x").GetDouble()),
-                    Y = Convert.ToDecimal(rect.GetProperty("y").GetDouble()),
-                    Width = Convert.ToDecimal(width),
-                    Height = Convert.ToDecimal(height)
-                };
+                var boundingBox = new ElementBox(
+                    rect.GetProperty("x").GetDouble(),
+                    rect.GetProperty("y").GetDouble(),
+                    width,
+                    height);
 
                 if (relativeToMainFrame)
                 {
-                    await AdjustToMainFrameAsync(nativeElement, boundingBox);
+                    return await AdjustToMainFrameAsync(nativeElement, boundingBox);
                 }
 
                 return boundingBox;
@@ -55,10 +52,10 @@ internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
 
         var box = await nativeElement.BoundingBoxAsync()
             ?? throw new InvalidOperationException("Element bounding box was null.");
-        var fallbackBoundingBox = ToPuppeteerBoundingBox(box);
+        var fallbackBoundingBox = ToElementBox(box);
         if (!relativeToMainFrame)
         {
-            await AdjustForChildFrameAsync(nativeElement, fallbackBoundingBox);
+            return await AdjustForChildFrameAsync(nativeElement, fallbackBoundingBox);
         }
 
         return fallbackBoundingBox;
@@ -70,16 +67,10 @@ internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
             : throw new InvalidOperationException(
                 $"The {nameof(PlaywrightCursorElementGeometry)} requires a Playwright element handle adapter.");
 
-    private static BoundingBox ToPuppeteerBoundingBox(PlaywrightBoundingBox box)
-        => new()
-        {
-            X = Convert.ToDecimal(box.X),
-            Y = Convert.ToDecimal(box.Y),
-            Width = Convert.ToDecimal(box.Width),
-            Height = Convert.ToDecimal(box.Height)
-        };
+    private static ElementBox ToElementBox(PlaywrightBoundingBox box)
+        => new(box.X, box.Y, box.Width, box.Height);
 
-    private static async Task AdjustToMainFrameAsync(PlaywrightElementHandle element, BoundingBox elementBox)
+    private static async Task<ElementBox> AdjustToMainFrameAsync(PlaywrightElementHandle element, ElementBox elementBox)
     {
         var frame = await element.OwnerFrameAsync();
         while (frame?.ParentFrame is not null)
@@ -88,17 +79,22 @@ internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
             var frameBox = await frameElement.BoundingBoxAsync();
             if (frameBox is null)
             {
-                return;
+                return elementBox;
             }
 
-            elementBox.X += Convert.ToDecimal(frameBox.X);
-            elementBox.Y += Convert.ToDecimal(frameBox.Y);
+            elementBox = elementBox with
+            {
+                X = elementBox.X + frameBox.X,
+                Y = elementBox.Y + frameBox.Y
+            };
 
             frame = frame.ParentFrame;
         }
+
+        return elementBox;
     }
 
-    private static async Task AdjustForChildFrameAsync(PlaywrightElementHandle element, BoundingBox elementBox)
+    private static async Task<ElementBox> AdjustForChildFrameAsync(PlaywrightElementHandle element, ElementBox elementBox)
     {
         var frame = await element.OwnerFrameAsync();
         while (frame?.ParentFrame is not null)
@@ -107,13 +103,18 @@ internal sealed class PlaywrightCursorElementGeometry : ICursorElementGeometry
             var frameBox = await frameElement.BoundingBoxAsync();
             if (frameBox is null)
             {
-                return;
+                return elementBox;
             }
 
-            elementBox.X -= Convert.ToDecimal(frameBox.X);
-            elementBox.Y -= Convert.ToDecimal(frameBox.Y);
+            elementBox = elementBox with
+            {
+                X = elementBox.X - frameBox.X,
+                Y = elementBox.Y - frameBox.Y
+            };
 
             frame = frame.ParentFrame;
         }
+
+        return elementBox;
     }
 }

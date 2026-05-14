@@ -1,6 +1,3 @@
-using PuppeteerSharp;
-using PuppeteerSharp.Input;
-
 namespace GhostCursorSharp.Internal;
 
 internal interface ICursorPageAdapter

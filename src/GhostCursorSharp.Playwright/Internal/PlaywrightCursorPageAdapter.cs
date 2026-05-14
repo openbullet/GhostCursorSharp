@@ -1,5 +1,4 @@
 using Microsoft.Playwright;
-using PuppeteerMouseButton = PuppeteerSharp.Input.MouseButton;
 
 namespace GhostCursorSharp.Internal;
 
@@ -43,14 +42,14 @@ internal sealed class PlaywrightCursorPageAdapter : ICursorPageAdapter
     public Task MouseWheelAsync(double deltaX, double deltaY)
         => _page.Mouse.WheelAsync((float)deltaX, (float)deltaY);
 
-    public Task MouseDownAsync(PuppeteerMouseButton button, int clickCount)
+    public Task MouseDownAsync(MouseButton button, int clickCount)
         => _page.Mouse.DownAsync(new MouseDownOptions
         {
             Button = MapButton(button),
             ClickCount = clickCount
         });
 
-    public Task MouseUpAsync(PuppeteerMouseButton button, int clickCount)
+    public Task MouseUpAsync(MouseButton button, int clickCount)
         => _page.Mouse.UpAsync(new MouseUpOptions
         {
             Button = MapButton(button),
@@ -63,12 +62,12 @@ internal sealed class PlaywrightCursorPageAdapter : ICursorPageAdapter
     public Task EvaluateFunctionAsync(string script, params object?[] args)
         => _page.EvaluateAsync(PlaywrightScriptExecutor.WrapFunction(script), args);
 
-    private static Microsoft.Playwright.MouseButton MapButton(PuppeteerMouseButton button)
+    private static Microsoft.Playwright.MouseButton MapButton(MouseButton button)
         => button switch
         {
-            PuppeteerMouseButton.Left => Microsoft.Playwright.MouseButton.Left,
-            PuppeteerMouseButton.Middle => Microsoft.Playwright.MouseButton.Middle,
-            PuppeteerMouseButton.Right => Microsoft.Playwright.MouseButton.Right,
+            MouseButton.Left => Microsoft.Playwright.MouseButton.Left,
+            MouseButton.Middle => Microsoft.Playwright.MouseButton.Middle,
+            MouseButton.Right => Microsoft.Playwright.MouseButton.Right,
             _ => throw new NotSupportedException($"Mouse button '{button}' is not supported by Playwright.")
         };
 }

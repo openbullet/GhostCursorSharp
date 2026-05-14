@@ -1,14 +1,8 @@
-using PuppeteerSharp;
-using PlaywrightPage = Microsoft.Playwright.IPage;
+namespace GhostCursorSharp.Internal;
 
-namespace GhostCursorSharp;
-
-/// <summary>
-/// Installs a visual mouse helper into a Puppeteer page for debugging cursor movement.
-/// </summary>
-public static class MouseHelper
+internal static class MouseHelperScript
 {
-    private const string Script = """
+    public const string Value = """
         (() => {
           const attachListener = () => {
             if (!document.head || !document.body) {
@@ -175,45 +169,4 @@ public static class MouseHelper
           }
         })();
         """;
-
-    /// <summary>
-    /// Installs a visual mouse helper into the page for the current document and future navigations.
-    /// </summary>
-    /// <param name="page">The page to decorate with the visual mouse helper.</param>
-    /// <returns>An installation handle that can remove the helper later.</returns>
-    public static async Task<MouseHelperInstallation> InstallAsync(IPage page)
-    {
-        var scriptIdentifier = await page.EvaluateExpressionOnNewDocumentAsync(Script);
-        await page.EvaluateExpressionAsync(Script);
-
-        return new MouseHelperInstallation(async () =>
-        {
-            await page.EvaluateExpressionAsync("""
-                (() => {
-                  window.__ghostCursorRemoveMouseHelper?.();
-                })();
-                """);
-
-            await page.RemoveScriptToEvaluateOnNewDocumentAsync(scriptIdentifier.Identifier);
-        });
-    }
-
-    /// <summary>
-    /// Installs a visual mouse helper into the current Playwright document.
-    /// </summary>
-    /// <param name="page">The Playwright page to decorate with the visual mouse helper.</param>
-    /// <returns>An installation handle that can remove the helper later.</returns>
-    public static async Task<MouseHelperInstallation> InstallAsync(PlaywrightPage page)
-    {
-        await page.EvaluateAsync(Script);
-
-        return new MouseHelperInstallation(async () =>
-        {
-            await page.EvaluateAsync("""
-                (() => {
-                  window.__ghostCursorRemoveMouseHelper?.();
-                })();
-                """);
-        });
-    }
 }

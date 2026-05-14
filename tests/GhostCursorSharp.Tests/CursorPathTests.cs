@@ -1,5 +1,3 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp.Tests;
 
 public class CursorPathTests
@@ -7,13 +5,7 @@ public class CursorPathTests
     [Fact]
     public void GetPointInBox_WithExplicitDestination_UsesTopLeftRelativeCoordinates()
     {
-        var box = new BoundingBox
-        {
-            X = 320,
-            Y = 240,
-            Width = 120,
-            Height = 40
-        };
+        var box = new ElementBox(320, 240, 120, 40);
 
         var point = CursorTargeting.GetPointInBox(box, new BoxOptions
         {
@@ -47,13 +39,7 @@ public class CursorPathTests
     [Fact]
     public void Generate_WithBoundingBox_EndsAtTheBoxOrigin()
     {
-        var box = new BoundingBox
-        {
-            X = 320,
-            Y = 240,
-            Width = 120,
-            Height = 40
-        };
+        var box = new ElementBox(320, 240, 120, 40);
 
         var path = CursorPath.Generate(
             new Vector(0, 0),
@@ -61,8 +47,8 @@ public class CursorPathTests
             new PathOptions { MoveSpeed = 10, SpreadOverride = 0 });
 
         Assert.NotEmpty(path);
-        Assert.True(Math.Abs(path[^1].X - Convert.ToDouble(box.X)) < 0.000001);
-        Assert.True(Math.Abs(path[^1].Y - Convert.ToDouble(box.Y)) < 0.000001);
+        Assert.True(Math.Abs(path[^1].X - box.X) < 0.000001);
+        Assert.True(Math.Abs(path[^1].Y - box.Y) < 0.000001);
     }
 
     [Fact]

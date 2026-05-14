@@ -1,10 +1,8 @@
-using PuppeteerSharp;
-
 namespace GhostCursorSharp.Internal;
 
 internal interface ICursorElementHandle
 {
-    Task<BoundingBox?> BoundingBoxAsync();
+    Task<ElementBox?> BoundingBoxAsync();
 
     Task EvaluateFunctionAsync(string script, params object?[] args);
 

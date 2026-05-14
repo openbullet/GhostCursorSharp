@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>Ruri.GhostCursorSharp.Puppeteer</PackageId>
+    <Authors>openbullet</Authors>
+    <Description>PuppeteerSharp integration for GhostCursorSharp human-like cursor automation.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/openbullet/GhostCursorSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/openbullet/GhostCursorSharp</RepositoryUrl>
+    <PackageTags>ghost-cursor;mouse;automation;puppeteer;puppeteersharp;bezier</PackageTags>
+    <Version>0.2.0</Version>
+    <PackageReleaseNotes>Split the library into Core, Puppeteer, and Playwright packages.</PackageReleaseNotes>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.25.0.139117">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GhostCursorSharp.Core\GhostCursorSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
+
+</Project>

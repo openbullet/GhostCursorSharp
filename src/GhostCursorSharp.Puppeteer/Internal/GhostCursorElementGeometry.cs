@@ -12,7 +12,7 @@ internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
         _page = page;
     }
 
-    public async Task<BoundingBox> GetElementBoxAsync(ICursorElementHandle element, bool relativeToMainFrame = true)
+    public async Task<ElementBox> GetElementBoxAsync(ICursorElementHandle element, bool relativeToMainFrame = true)
     {
         var nativeElement = UnwrapElement(element);
 
@@ -37,17 +37,15 @@ internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
                 throw new InvalidOperationException("Element content quads were not available.");
             }
 
-            var elementBox = new BoundingBox
-            {
-                X = Convert.ToDecimal(firstQuad[0]),
-                Y = Convert.ToDecimal(firstQuad[1]),
-                Width = Convert.ToDecimal(firstQuad[4] - firstQuad[0]),
-                Height = Convert.ToDecimal(firstQuad[5] - firstQuad[1])
-            };
+            var elementBox = new ElementBox(
+                firstQuad[0],
+                firstQuad[1],
+                firstQuad[4] - firstQuad[0],
+                firstQuad[5] - firstQuad[1]);
 
             if (!relativeToMainFrame)
             {
-                await AdjustForChildFrameAsync(nativeElement, elementBox);
+                return await AdjustForChildFrameAsync(nativeElement, elementBox);
             }
 
             return elementBox;
@@ -56,21 +54,21 @@ internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
         {
             try
             {
-                return await nativeElement.BoundingBoxAsync()
+                var boundingBox = await nativeElement.BoundingBoxAsync()
                     ?? throw new InvalidOperationException("Element bounding box was null.");
+
+                return new ElementBox(
+                    Convert.ToDouble(boundingBox.X),
+                    Convert.ToDouble(boundingBox.Y),
+                    Convert.ToDouble(boundingBox.Width),
+                    Convert.ToDouble(boundingBox.Height));
             }
             catch
             {
                 var box = await nativeElement.EvaluateFunctionAsync<DomRectBox>(
                     "(el) => { const rect = el.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }");
 
-                return new BoundingBox
-                {
-                    X = Convert.ToDecimal(box.X),
-                    Y = Convert.ToDecimal(box.Y),
-                    Width = Convert.ToDecimal(box.Width),
-                    Height = Convert.ToDecimal(box.Height)
-                };
+                return new ElementBox(box.X, box.Y, box.Width, box.Height);
             }
         }
     }
@@ -101,13 +99,13 @@ internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
         return objectIdProperty?.GetValue(remoteObject) as string;
     }
 
-    private static async Task AdjustForChildFrameAsync(IElementHandle element, BoundingBox elementBox)
+    private static async Task<ElementBox> AdjustForChildFrameAsync(IElementHandle element, ElementBox elementBox)
     {
         var elementFrame = await element.ContentFrameAsync();
         var parentFrame = elementFrame?.ParentFrame;
         if (parentFrame is null)
         {
-            return;
+            return elementBox;
         }
 
         var iframes = await parentFrame.QuerySelectorAllAsync("xpath/.//iframe");
@@ -121,13 +119,17 @@ internal sealed class PuppeteerCursorElementGeometry : ICursorElementGeometry
             var frameBox = await iframe.BoundingBoxAsync();
             if (frameBox is null)
             {
-                return;
+                return elementBox;
             }
 
-            elementBox.X -= frameBox.X;
-            elementBox.Y -= frameBox.Y;
-            return;
+            return elementBox with
+            {
+                X = elementBox.X - Convert.ToDouble(frameBox.X),
+                Y = elementBox.Y - Convert.ToDouble(frameBox.Y)
+            };
         }
+
+        return elementBox;
     }
 
     private sealed class ContentQuadsResponse

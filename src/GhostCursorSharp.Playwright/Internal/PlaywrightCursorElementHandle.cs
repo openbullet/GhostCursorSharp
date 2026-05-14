@@ -1,6 +1,5 @@
 using PlaywrightBoundingBox = Microsoft.Playwright.ElementHandleBoundingBoxResult;
 using PlaywrightElementHandle = Microsoft.Playwright.IElementHandle;
-using PuppeteerSharp;
 
 namespace GhostCursorSharp.Internal;
 
@@ -13,7 +12,7 @@ internal sealed class PlaywrightCursorElementHandle : INativeCursorElementHandle
 
     public PlaywrightElementHandle NativeElement { get; }
 
-    public async Task<BoundingBox?> BoundingBoxAsync()
+    public async Task<ElementBox?> BoundingBoxAsync()
     {
         PlaywrightBoundingBox? boundingBox = await NativeElement.BoundingBoxAsync();
         if (boundingBox is null)
@@ -21,13 +20,7 @@ internal sealed class PlaywrightCursorElementHandle : INativeCursorElementHandle
             return null;
         }
 
-        return new BoundingBox
-        {
-            X = Convert.ToDecimal(boundingBox.X),
-            Y = Convert.ToDecimal(boundingBox.Y),
-            Width = Convert.ToDecimal(boundingBox.Width),
-            Height = Convert.ToDecimal(boundingBox.Height)
-        };
+        return new ElementBox(boundingBox.X, boundingBox.Y, boundingBox.Width, boundingBox.Height);
     }
 
     public Task EvaluateFunctionAsync(string script, params object?[] args)

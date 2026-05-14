@@ -11,8 +11,20 @@ internal sealed class PuppeteerCursorElementHandle : INativeCursorElementHandle<
 
     public IElementHandle NativeElement { get; }
 
-    public Task<BoundingBox?> BoundingBoxAsync()
-        => NativeElement.BoundingBoxAsync();
+    public async Task<ElementBox?> BoundingBoxAsync()
+    {
+        var boundingBox = await NativeElement.BoundingBoxAsync();
+        if (boundingBox is null)
+        {
+            return null;
+        }
+
+        return new ElementBox(
+            Convert.ToDouble(boundingBox.X),
+            Convert.ToDouble(boundingBox.Y),
+            Convert.ToDouble(boundingBox.Width),
+            Convert.ToDouble(boundingBox.Height));
+    }
 
     public Task EvaluateFunctionAsync(string script, params object?[] args)
         => NativeElement.EvaluateFunctionAsync(script, args);

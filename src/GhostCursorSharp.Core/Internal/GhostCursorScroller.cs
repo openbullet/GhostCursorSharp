@@ -1,4 +1,3 @@
-using PuppeteerSharp;
 using System.Text.Json;
 
 namespace GhostCursorSharp.Internal;
@@ -216,12 +215,12 @@ internal sealed class GhostCursorScroller
             ScrollPositionLeft: metrics.GetProperty("scrollPositionLeft").GetDouble());
     }
 
-    private static BoxEdges ToBoxEdges(BoundingBox box)
+    private static BoxEdges ToBoxEdges(ElementBox box)
         => new(
-            Top: Convert.ToDouble(box.Y),
-            Left: Convert.ToDouble(box.X),
-            Bottom: Convert.ToDouble(box.Y + box.Height),
-            Right: Convert.ToDouble(box.X + box.Width));
+            Top: box.Y,
+            Left: box.X,
+            Bottom: box.Y + box.Height,
+            Right: box.X + box.Width);
 
     private static Task<bool> IsElementInViewportAsync(ICursorElementHandle element, double margin)
         => element.EvaluateFunctionAsync<bool>(

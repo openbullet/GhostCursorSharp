@@ -50,8 +50,11 @@ jobs:
       run: dotnet test GhostCursorSharp.slnx --configuration Release --no-build
 
     # Don't override the version of the package; trust the version in the project file.
-    - name: Create NuGet Package
-      run: dotnet pack src/GhostCursorSharp/GhostCursorSharp.csproj --output nupkgs --configuration Release --no-build
+    - name: Create NuGet Packages
+      run: |
+        dotnet pack src/GhostCursorSharp.Core/GhostCursorSharp.csproj --output nupkgs --configuration Release --no-build
+        dotnet pack src/GhostCursorSharp.Puppeteer/GhostCursorSharp.Puppeteer.csproj --output nupkgs --configuration Release --no-build
+        dotnet pack src/GhostCursorSharp.Playwright/GhostCursorSharp.Playwright.csproj --output nupkgs --configuration Release --no-build
 
     - name: Upload NuGet Package
       run: dotnet nuget push "nupkgs/*.nupkg" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
